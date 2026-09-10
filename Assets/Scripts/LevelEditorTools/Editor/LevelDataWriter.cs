@@ -60,6 +60,40 @@ namespace WaterConveyorSort.LevelEditorTools
             return index;
         }
 
+        public void DeleteNode(int nodeIndex)
+        {
+            serialized.Update();
+            SerializedProperty nodes = serialized.FindProperty("buoyNodes");
+            if (nodeIndex < 0 || nodeIndex >= nodes.arraySize)
+                return;
+
+            nodes.DeleteArrayElementAtIndex(nodeIndex);
+            Commit("Delete Buoy Node");
+        }
+
+        public void MoveNode(int nodeIndex, Vector2Int gridPosition)
+        {
+            serialized.Update();
+            SerializedProperty nodes = serialized.FindProperty("buoyNodes");
+            if (nodeIndex < 0 || nodeIndex >= nodes.arraySize)
+                return;
+
+            nodes.GetArrayElementAtIndex(nodeIndex).FindPropertyRelative("gridPosition").vector2IntValue = gridPosition;
+            Commit("Move Buoy Node");
+        }
+
+        public void ReorderNode(int nodeIndex, int offset)
+        {
+            serialized.Update();
+            SerializedProperty nodes = serialized.FindProperty("buoyNodes");
+            int targetIndex = nodeIndex + offset;
+            if (nodeIndex < 0 || nodeIndex >= nodes.arraySize || targetIndex < 0 || targetIndex >= nodes.arraySize)
+                return;
+
+            nodes.MoveArrayElement(nodeIndex, targetIndex);
+            Commit("Reorder Buoy Node");
+        }
+
         public void AddColumn(int nodeIndex)
         {
             serialized.Update();
@@ -71,6 +105,30 @@ namespace WaterConveyorSort.LevelEditorTools
             columns.InsertArrayElementAtIndex(index);
             EnsureColumnDefaults(columns.GetArrayElementAtIndex(index));
             Commit("Add Buoy Column");
+        }
+
+        public void DeleteColumn(int nodeIndex, int columnIndex)
+        {
+            serialized.Update();
+            SerializedProperty columns = FindColumns(nodeIndex);
+            if (columns == null || columnIndex < 0 || columnIndex >= columns.arraySize)
+                return;
+
+            columns.DeleteArrayElementAtIndex(columnIndex);
+            Commit("Delete Buoy Column");
+        }
+
+        public void ReorderColumn(int nodeIndex, int columnIndex, int offset)
+        {
+            serialized.Update();
+            SerializedProperty columns = FindColumns(nodeIndex);
+            int targetIndex = columnIndex + offset;
+            if (columns == null || columnIndex < 0 || columnIndex >= columns.arraySize ||
+                targetIndex < 0 || targetIndex >= columns.arraySize)
+                return;
+
+            columns.MoveArrayElement(columnIndex, targetIndex);
+            Commit("Reorder Buoy Column");
         }
 
         public void SetBuoyCount(int nodeIndex, int columnIndex, int count)
@@ -94,6 +152,30 @@ namespace WaterConveyorSort.LevelEditorTools
             Commit("Edit Buoy Count");
         }
 
+        public void SaveColumnType(int nodeIndex, int columnIndex, ColumnElementType columnType)
+        {
+            serialized.Update();
+            SerializedProperty columns = FindColumns(nodeIndex);
+            if (columns == null || columnIndex < 0 || columnIndex >= columns.arraySize)
+                return;
+
+            columns.GetArrayElementAtIndex(columnIndex).FindPropertyRelative("columnType").enumValueIndex =
+                (int)columnType;
+            Commit("Edit Column Type");
+        }
+
+        public void SaveColumnTypeCount(int nodeIndex, int columnIndex, int count)
+        {
+            serialized.Update();
+            SerializedProperty columns = FindColumns(nodeIndex);
+            if (columns == null || columnIndex < 0 || columnIndex >= columns.arraySize)
+                return;
+
+            columns.GetArrayElementAtIndex(columnIndex).FindPropertyRelative("columnTypeCount").intValue =
+                Mathf.Max(0, count);
+            Commit("Edit Column Type Count");
+        }
+
         public void SaveBuoyColor(int nodeIndex, int columnIndex, int buoyIndex, int colorCode)
         {
             serialized.Update();
@@ -103,6 +185,28 @@ namespace WaterConveyorSort.LevelEditorTools
 
             buoy.FindPropertyRelative("colorCode").intValue = colorCode;
             Commit("Edit Buoy Color");
+        }
+
+        public void SaveBuoyType(int nodeIndex, int columnIndex, int buoyIndex, BuoyElementType buoyType)
+        {
+            serialized.Update();
+            SerializedProperty buoy = FindBuoy(nodeIndex, columnIndex, buoyIndex);
+            if (buoy == null)
+                return;
+
+            buoy.FindPropertyRelative("buoyType").enumValueIndex = (int)buoyType;
+            Commit("Edit Buoy Type");
+        }
+
+        public void SaveBuoyTypeCount(int nodeIndex, int columnIndex, int buoyIndex, int count)
+        {
+            serialized.Update();
+            SerializedProperty buoy = FindBuoy(nodeIndex, columnIndex, buoyIndex);
+            if (buoy == null)
+                return;
+
+            buoy.FindPropertyRelative("buoyTypeCount").intValue = Mathf.Max(0, count);
+            Commit("Edit Buoy Type Count");
         }
 
         private void Commit(string undoName)
@@ -149,13 +253,17 @@ namespace WaterConveyorSort.LevelEditorTools
 
         private void EnsureColumnDefaults(SerializedProperty column)
         {
+            column.FindPropertyRelative("columnType").enumValueIndex = (int)ColumnElementType.NormalPeg;
+            column.FindPropertyRelative("columnTypeCount").intValue = 0;
             column.FindPropertyRelative("elements").arraySize = 0;
             SerializedProperty buoys = column.FindPropertyRelative("buoys");
             buoys.arraySize = BuoyColumnData.DefaultBuoyCount;
             for (int i = 0; i < buoys.arraySize; i++)
             {
-                SerializedProperty buoy = buoys.GetArrayElementAtIndex(i);
+            SerializedProperty buoy = buoys.GetArrayElementAtIndex(i);
                 buoy.FindPropertyRelative("colorCode").intValue = 0;
+                buoy.FindPropertyRelative("buoyType").enumValueIndex = (int)BuoyElementType.NormalBouy;
+                buoy.FindPropertyRelative("buoyTypeCount").intValue = 0;
                 buoy.FindPropertyRelative("elements").arraySize = 0;
             }
         }

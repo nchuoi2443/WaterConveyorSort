@@ -47,83 +47,153 @@ MonoBehaviour:
   buoyNodes:
   - gridPosition: {x: 4, y: 6}
     columns:
-    - elements: []
+    - columnType: 0
+      columnTypeCount: 0
+      elements: []
       buoys:
       - colorCode: 2
+        buoyType: 0
+        buoyTypeCount: 0
         elements: []
-      - colorCode: 3
+      - colorCode: 2
+        buoyType: 0
+        buoyTypeCount: 0
         elements: []
-      - colorCode: 3
+      - colorCode: 2
+        buoyType: 0
+        buoyTypeCount: 0
         elements: []
       - colorCode: 1
+        buoyType: 0
+        buoyTypeCount: 0
         elements: []
       - colorCode: 3
+        buoyType: 0
+        buoyTypeCount: 0
         elements: []
-    - elements: []
+    - columnType: 0
+      columnTypeCount: 0
+      elements: []
       buoys:
       - colorCode: 0
+        buoyType: 0
+        buoyTypeCount: 0
         elements: []
       - colorCode: 0
+        buoyType: 0
+        buoyTypeCount: 0
         elements: []
       - colorCode: 0
+        buoyType: 0
+        buoyTypeCount: 0
         elements: []
       - colorCode: 0
+        buoyType: 0
+        buoyTypeCount: 0
         elements: []
       - colorCode: 0
+        buoyType: 0
+        buoyTypeCount: 0
         elements: []
   - gridPosition: {x: 6, y: 8}
     columns:
-    - elements: []
+    - columnType: 0
+      columnTypeCount: 0
+      elements: []
       buoys:
       - colorCode: 0
+        buoyType: 0
+        buoyTypeCount: 0
         elements: []
       - colorCode: 0
+        buoyType: 0
+        buoyTypeCount: 0
         elements: []
       - colorCode: 0
+        buoyType: 0
+        buoyTypeCount: 0
         elements: []
       - colorCode: 0
+        buoyType: 0
+        buoyTypeCount: 0
         elements: []
       - colorCode: 0
-        elements: []
-  - gridPosition: {x: 9, y: 5}
-    columns:
-    - elements: []
-      buoys:
-      - colorCode: 0
-        elements: []
-      - colorCode: 0
-        elements: []
-      - colorCode: 0
-        elements: []
-      - colorCode: 0
-        elements: []
-      - colorCode: 0
+        buoyType: 0
+        buoyTypeCount: 0
         elements: []
   - gridPosition: {x: 6, y: 3}
     columns:
-    - elements: []
+    - columnType: 0
+      columnTypeCount: 0
+      elements: []
       buoys:
       - colorCode: 0
+        buoyType: 0
+        buoyTypeCount: 0
         elements: []
       - colorCode: 0
+        buoyType: 0
+        buoyTypeCount: 0
         elements: []
       - colorCode: 0
+        buoyType: 0
+        buoyTypeCount: 0
         elements: []
       - colorCode: 0
+        buoyType: 0
+        buoyTypeCount: 0
         elements: []
       - colorCode: 0
+        buoyType: 0
+        buoyTypeCount: 0
+        elements: []
+    - columnType: 0
+      columnTypeCount: 0
+      elements: []
+      buoys:
+      - colorCode: 0
+        buoyType: 0
+        buoyTypeCount: 0
+        elements: []
+      - colorCode: 0
+        buoyType: 0
+        buoyTypeCount: 0
+        elements: []
+      - colorCode: 0
+        buoyType: 0
+        buoyTypeCount: 0
+        elements: []
+      - colorCode: 0
+        buoyType: 0
+        buoyTypeCount: 0
+        elements: []
+      - colorCode: 0
+        buoyType: 0
+        buoyTypeCount: 0
         elements: []
   - gridPosition: {x: 2, y: 0}
     columns:
-    - elements: []
+    - columnType: 0
+      columnTypeCount: 0
+      elements: []
       buoys:
-      - colorCode: 0
+      - colorCode: 4
+        buoyType: 0
+        buoyTypeCount: 0
         elements: []
-      - colorCode: 0
+      - colorCode: 4
+        buoyType: 0
+        buoyTypeCount: 0
         elements: []
-      - colorCode: 0
+      - colorCode: 4
+        buoyType: 0
+        buoyTypeCount: 0
         elements: []
-      - colorCode: 0
+      - colorCode: 4
+        buoyType: 0
+        buoyTypeCount: 0
         elements: []
-      - colorCode: 0
+      - colorCode: 4
+        buoyType: 0
+        buoyTypeCount: 0
         elements: []

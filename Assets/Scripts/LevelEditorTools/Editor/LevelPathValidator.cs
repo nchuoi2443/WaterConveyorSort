@@ -54,6 +54,25 @@ namespace WaterConveyorSort.LevelEditorTools
                 ContainsPathCell(level.Path.Cells, cell + Vector2Int.down);
         }
 
+        private bool CanMoveNode(LevelDataSO level, int nodeIndex, Vector2Int cell)
+        {
+            if (nodeIndex < 0 || nodeIndex >= level.BuoyNodes.Count)
+                return false;
+            if (!Contains(cell, level.Board.Width, level.Board.Height))
+                return false;
+            if (ContainsPathCell(level.Path.Cells, cell))
+                return false;
+
+            int existing = FindNodeIndex(level, cell);
+            if (existing >= 0 && existing != nodeIndex)
+                return false;
+
+            return ContainsPathCell(level.Path.Cells, cell + Vector2Int.left) ||
+                ContainsPathCell(level.Path.Cells, cell + Vector2Int.right) ||
+                ContainsPathCell(level.Path.Cells, cell + Vector2Int.up) ||
+                ContainsPathCell(level.Path.Cells, cell + Vector2Int.down);
+        }
+
         private int FindNodeIndex(LevelDataSO level, Vector2Int cell)
         {
             for (int i = 0; i < level.BuoyNodes.Count; i++)

@@ -16,8 +16,9 @@ namespace WaterConveyorSort.LevelEditorTools
         private GUIStyle colorCellOutlineStyle;
 
         public void Draw(LevelDataSO level, ColorDataSO colorData, string colorDataFolder,
-            int selectedNodeIndex, LevelDataWriter writer)
+            ref int selectedNodeIndex, LevelDataWriter writer, out bool moveRequested)
         {
+            moveRequested = false;
             EditorGUILayout.Space();
             EditorGUILayout.LabelField("Node Editor", EditorStyles.boldLabel);
 
@@ -38,6 +39,42 @@ namespace WaterConveyorSort.LevelEditorTools
 
             using (new EditorGUILayout.HorizontalScope())
             {
+                using (new EditorGUI.DisabledScope(selectedNodeIndex <= 0))
+                {
+                    if (GUILayout.Button("Node ↑"))
+                    {
+                        writer.ReorderNode(selectedNodeIndex, -1);
+                        selectedNodeIndex--;
+                        return;
+                    }
+                }
+
+                using (new EditorGUI.DisabledScope(selectedNodeIndex >= level.BuoyNodes.Count - 1))
+                {
+                    if (GUILayout.Button("Node ↓"))
+                    {
+                        writer.ReorderNode(selectedNodeIndex, 1);
+                        selectedNodeIndex++;
+                        return;
+                    }
+                }
+
+                if (GUILayout.Button("Move Node"))
+                {
+                    moveRequested = true;
+                    return;
+                }
+
+                if (GUILayout.Button("Delete Node"))
+                {
+                    writer.DeleteNode(selectedNodeIndex);
+                    selectedNodeIndex = Mathf.Min(selectedNodeIndex, level.BuoyNodes.Count - 2);
+                    return;
+                }
+            }
+
+            using (new EditorGUILayout.HorizontalScope())
+            {
                 if (GUILayout.Button("Thêm cột"))
                 {
                     writer.AddColumn(selectedNodeIndex);
@@ -53,6 +90,58 @@ namespace WaterConveyorSort.LevelEditorTools
             selectedColumnIndex = EditorGUILayout.Popup("Column", selectedColumnIndex, BuildColumnLabels(node.Columns.Count));
 
             BuoyColumnData column = node.Columns[selectedColumnIndex];
+
+            using (new EditorGUILayout.HorizontalScope())
+            {
+                using (new EditorGUI.DisabledScope(selectedColumnIndex <= 0))
+                {
+                    if (GUILayout.Button("Column ↑"))
+                    {
+                        writer.ReorderColumn(selectedNodeIndex, selectedColumnIndex, -1);
+                        selectedColumnIndex--;
+                        return;
+                    }
+                }
+
+                using (new EditorGUI.DisabledScope(selectedColumnIndex >= node.Columns.Count - 1))
+                {
+                    if (GUILayout.Button("Column ↓"))
+                    {
+                        writer.ReorderColumn(selectedNodeIndex, selectedColumnIndex, 1);
+                        selectedColumnIndex++;
+                        return;
+                    }
+                }
+
+                if (GUILayout.Button("Delete Column"))
+                {
+                    writer.DeleteColumn(selectedNodeIndex, selectedColumnIndex);
+                    selectedColumnIndex = Mathf.Min(selectedColumnIndex, node.Columns.Count - 2);
+                    return;
+                }
+            }
+
+            using (new EditorGUILayout.HorizontalScope())
+            {
+                EditorGUILayout.LabelField("ColumnType", GUILayout.Width(EditorGUIUtility.labelWidth));
+                EditorGUI.BeginChangeCheck();
+                ColumnElementType columnType = (ColumnElementType)EditorGUILayout.EnumPopup(column.ColumnType);
+                if (EditorGUI.EndChangeCheck())
+                {
+                    writer.SaveColumnType(selectedNodeIndex, selectedColumnIndex, columnType);
+                    return;
+                }
+
+                EditorGUILayout.LabelField("Count", GUILayout.Width(42f));
+                EditorGUI.BeginChangeCheck();
+                int columnTypeCount = EditorGUILayout.DelayedIntField(column.ColumnTypeCount, GUILayout.Width(64f));
+                if (EditorGUI.EndChangeCheck())
+                {
+                    writer.SaveColumnTypeCount(selectedNodeIndex, selectedColumnIndex, columnTypeCount);
+                    return;
+                }
+            }
+
             EditorGUI.BeginChangeCheck();
             int buoyCount = EditorGUILayout.DelayedIntField("Số phao", column.BuoyCount);
             if (EditorGUI.EndChangeCheck())
@@ -99,6 +188,14 @@ namespace WaterConveyorSort.LevelEditorTools
             using (new EditorGUILayout.VerticalScope())
             {
                 EditorGUILayout.LabelField($"Column {selectedColumnIndex + 1}", EditorStyles.boldLabel);
+                using (new EditorGUILayout.HorizontalScope())
+                {
+                    GUILayout.Space(36f);
+                    EditorGUILayout.LabelField("Color", EditorStyles.boldLabel, GUILayout.Width(96f));
+                    EditorGUILayout.LabelField("BouyType", EditorStyles.boldLabel, GUILayout.Width(130f));
+                    EditorGUILayout.LabelField("Count", EditorStyles.boldLabel, GUILayout.Width(64f));
+                }
+
                 for (int i = column.Buoys.Count - 1; i >= 0; i--)
                 {
                     BuoyData buoy = column.Buoys[i];
@@ -109,6 +206,17 @@ namespace WaterConveyorSort.LevelEditorTools
                         Rect rect = GUILayoutUtility.GetRect(96f, 28f, GUILayout.Width(96f), GUILayout.Height(28f));
                         if (DrawColorCell(rect, color, false, GetColorName(colorData, buoy.ColorCode)))
                             writer.SaveBuoyColor(selectedNodeIndex, selectedColumnIndex, i, selectedColorCode);
+
+                        EditorGUI.BeginChangeCheck();
+                        BuoyElementType buoyType = (BuoyElementType)EditorGUILayout.EnumPopup(buoy.BuoyType,
+                            GUILayout.Width(130f));
+                        if (EditorGUI.EndChangeCheck())
+                            writer.SaveBuoyType(selectedNodeIndex, selectedColumnIndex, i, buoyType);
+
+                        EditorGUI.BeginChangeCheck();
+                        int buoyTypeCount = EditorGUILayout.DelayedIntField(buoy.BuoyTypeCount, GUILayout.Width(64f));
+                        if (EditorGUI.EndChangeCheck())
+                            writer.SaveBuoyTypeCount(selectedNodeIndex, selectedColumnIndex, i, buoyTypeCount);
                     }
                 }
             }

@@ -61,10 +61,15 @@ namespace WaterConveyorSort.LevelData
     {
         public const int DefaultBuoyCount = 5;
 
+        [SerializeField] private ColumnElementType columnType = ColumnElementType.NormalPeg;
+        [SerializeField, Min(0)] private int columnTypeCount;
+
         // An empty list means the column has no elements.
         [SerializeField] private List<ColumnElementData> elements = new List<ColumnElementData>();
         [SerializeField] private List<BuoyData> buoys = CreateDefaultBuoys();
 
+        public ColumnElementType ColumnType => columnType;
+        public int ColumnTypeCount => columnTypeCount;
         public IReadOnlyList<ColumnElementData> Elements => elements;
         public IReadOnlyList<BuoyData> Buoys => buoys;
         public int BuoyCount => buoys.Count;
@@ -86,9 +91,13 @@ namespace WaterConveyorSort.LevelData
     {
         // The editor assigns this code from ColorDataSO so palette colors can change safely.
         [SerializeField] private int colorCode;
+        [SerializeField] private BuoyElementType buoyType = BuoyElementType.NormalBouy;
+        [SerializeField, Min(0)] private int buoyTypeCount;
         [SerializeField] private List<BuoyElementData> elements = new List<BuoyElementData>();
 
         public int ColorCode => colorCode;
+        public BuoyElementType BuoyType => buoyType;
+        public int BuoyTypeCount => buoyTypeCount;
         public IReadOnlyList<BuoyElementData> Elements => elements;
     }
 
