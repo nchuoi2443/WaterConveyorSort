@@ -5,9 +5,9 @@ using WaterConveyorSort.LevelData;
 
 namespace WaterConveyorSort.LevelEditorTools
 {
-    internal static class LevelPathValidator
+    public sealed partial class LevelEditorTool
     {
-        public static bool FitsBoard(LevelDataSO level, int width, int height)
+        private bool FitsBoard(LevelDataSO level, int width, int height)
         {
             foreach (Vector2Int cell in level.Path.Cells)
                 if (!Contains(cell, width, height)) return false;
@@ -16,7 +16,7 @@ namespace WaterConveyorSort.LevelEditorTools
             return true;
         }
 
-        public static string Validate(IReadOnlyList<Vector2Int> cells, bool closed, LevelDataSO level)
+        private string ValidatePath(IReadOnlyList<Vector2Int> cells, bool closed, LevelDataSO level)
         {
             if (cells.Count < 2) return "Đường cần ít nhất 2 ô.";
             var occupied = new HashSet<Vector2Int>();
@@ -39,10 +39,47 @@ namespace WaterConveyorSort.LevelEditorTools
             return null;
         }
 
-        private static bool Contains(Vector2Int cell, int width, int height) =>
+        private bool CanPlaceNode(LevelDataSO level, Vector2Int cell)
+        {
+            if (!Contains(cell, level.Board.Width, level.Board.Height))
+                return false;
+            if (ContainsPathCell(level.Path.Cells, cell))
+                return false;
+            if (FindNodeIndex(level, cell) >= 0)
+                return true;
+
+            return ContainsPathCell(level.Path.Cells, cell + Vector2Int.left) ||
+                ContainsPathCell(level.Path.Cells, cell + Vector2Int.right) ||
+                ContainsPathCell(level.Path.Cells, cell + Vector2Int.up) ||
+                ContainsPathCell(level.Path.Cells, cell + Vector2Int.down);
+        }
+
+        private int FindNodeIndex(LevelDataSO level, Vector2Int cell)
+        {
+            for (int i = 0; i < level.BuoyNodes.Count; i++)
+            {
+                if (level.BuoyNodes[i].GridPosition == cell)
+                    return i;
+            }
+
+            return -1;
+        }
+
+        private bool ContainsPathCell(IReadOnlyList<Vector2Int> cells, Vector2Int target)
+        {
+            for (int i = 0; i < cells.Count; i++)
+            {
+                if (cells[i] == target)
+                    return true;
+            }
+
+            return false;
+        }
+
+        private bool Contains(Vector2Int cell, int width, int height) =>
             cell.x >= 0 && cell.y >= 0 && cell.x < width && cell.y < height;
 
-        private static bool Adjacent(Vector2Int a, Vector2Int b) =>
+        private bool Adjacent(Vector2Int a, Vector2Int b) =>
             Mathf.Abs(a.x - b.x) + Mathf.Abs(a.y - b.y) == 1;
     }
 }

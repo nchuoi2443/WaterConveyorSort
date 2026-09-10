@@ -6,7 +6,7 @@ using WaterConveyorSort.LevelData;
 namespace WaterConveyorSort.LevelEditorTools
 {
     // Draws the grid and converts pointer input into board coordinates.
-    internal sealed class LevelBoardView
+    public sealed partial class LevelBoardView
     {
         private Vector2 scroll;
         private int capturedControl;
@@ -20,7 +20,7 @@ namespace WaterConveyorSort.LevelEditorTools
         }
 
         public bool Draw(BoardData board, IReadOnlyList<Vector2Int> cells, bool closed,
-            bool editable, out Vector2Int selectedCell)
+            IReadOnlyList<BuoyNodeData> nodes, int selectedNodeIndex, bool editable, out Vector2Int selectedCell)
         {
             selectedCell = default;
             bool selected = false;
@@ -55,6 +55,16 @@ namespace WaterConveyorSort.LevelEditorTools
                     EditorGUI.DrawRect(rect, color);
                     GUI.Label(rect, (i + 1).ToString(), EditorStyles.centeredGreyMiniLabel);
                 }
+
+                for (int i = 0; i < nodes.Count; i++)
+                {
+                    Rect rect = CellRect(nodes[i].GridPosition, board.Height);
+                    if (rect.xMax < scroll.x || rect.xMin > scroll.x + viewport.width ||
+                        rect.yMax < scroll.y || rect.yMin > scroll.y + viewport.height) continue;
+                    Color color = i == selectedNodeIndex ? new Color(1f, 0.85f, 0.25f) : new Color(0.6f, 0.3f, 0.9f);
+                    EditorGUI.DrawRect(rect, color);
+                    GUI.Label(rect, $"N{i + 1}", EditorStyles.centeredGreyMiniLabel);
+                }
             }
 
             bool inside = boardRect.Contains(evt.mousePosition) &&
@@ -85,7 +95,7 @@ namespace WaterConveyorSort.LevelEditorTools
             return selected;
         }
 
-        private static Rect CellRect(Vector2Int cell, int height)
+        private Rect CellRect(Vector2Int cell, int height)
         {
             return new Rect(cell.x * CellPixels + 2, (height - 1 - cell.y) * CellPixels + 2,
                 CellPixels - 3, CellPixels - 3);

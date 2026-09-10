@@ -6,11 +6,14 @@ using WaterConveyorSort.LevelData;
 namespace WaterConveyorSort.LevelEditorTools
 {
     [CustomEditor(typeof(LevelDataSO))]
-    public sealed class LevelEditorTool : Editor
+    public sealed partial class LevelEditorTool : Editor
     {
         private readonly LevelBoardView boardView = new LevelBoardView();
+        private readonly LevelNodeEditorView nodeEditor = new LevelNodeEditorView();
         private readonly LevelPathDraft draft = new LevelPathDraft();
         private LevelDataWriter writer;
+        private bool isEditingNodes;
+        private int selectedNodeIndex = -1;
         private string message;
 
         private void OnEnable()
@@ -28,6 +31,8 @@ namespace WaterConveyorSort.LevelEditorTools
         private void OnUndoRedo()
         {
             draft.Cancel();
+            isEditingNodes = false;
+            selectedNodeIndex = -1;
             boardView.ReleaseInput();
             message = null;
             Repaint();
@@ -37,6 +42,8 @@ namespace WaterConveyorSort.LevelEditorTools
         {
             serializedObject.Update();
             var level = (LevelDataSO)target;
+            ColorDataSO colorData = ResolveColorData(level);
+            DrawColorSettings(level, colorData);
             DrawBoardSettings(level);
             EditorGUILayout.Space();
             DrawToolbar(level);
@@ -49,15 +56,40 @@ namespace WaterConveyorSort.LevelEditorTools
                   "Click ô đã có để cắt phần đường phía sau. Gốc (0, 0) ở góc dưới trái."
                 : "Chọn Vẽ spline để chỉnh dữ liệu đường trên board.", MessageType.Info);
 
-            if (boardView.Draw(level.Board, cells, closed, draft.IsEditing, out Vector2Int cell))
+            bool canSelectBoard = draft.IsEditing || isEditingNodes;
+            if (boardView.Draw(level.Board, cells, closed, level.BuoyNodes, selectedNodeIndex,
+                    canSelectBoard, out Vector2Int cell))
             {
-                draft.Visit(cell);
-                message = null;
+                if (draft.IsEditing)
+                {
+                    draft.Visit(cell);
+                    message = null;
+                }
+                else
+                    SelectOrCreateNode(level, cell);
+
                 Repaint();
             }
 
             if (!string.IsNullOrEmpty(message))
                 EditorGUILayout.HelpBox(message, MessageType.Warning);
+
+            nodeEditor.Draw(level, colorData, ColorDataFolder, selectedNodeIndex, writer);
+        }
+
+        private void DrawColorSettings(LevelDataSO level, ColorDataSO resolvedColorData)
+        {
+            EditorGUILayout.LabelField("Color Settings", EditorStyles.boldLabel);
+            EditorGUI.BeginChangeCheck();
+            var colorData = (ColorDataSO)EditorGUILayout.ObjectField("Color Data Override", level.ColorData,
+                typeof(ColorDataSO), false);
+            if (EditorGUI.EndChangeCheck())
+                writer.SaveColorData(colorData);
+
+            using (new EditorGUI.DisabledScope(true))
+            {
+                EditorGUILayout.ObjectField("Active Color Data", resolvedColorData, typeof(ColorDataSO), false);
+            }
         }
 
         private void DrawBoardSettings(LevelDataSO level)
@@ -74,7 +106,7 @@ namespace WaterConveyorSort.LevelEditorTools
                     width = Mathf.Max(1, width);
                     height = Mathf.Max(1, height);
                     size = float.IsNaN(size) || float.IsInfinity(size) ? 1f : Mathf.Max(0.01f, size);
-                    if (LevelPathValidator.FitsBoard(level, width, height))
+                    if (FitsBoard(level, width, height))
                     {
                         writer.SaveBoard(width, height, size);
                         message = null;
@@ -92,6 +124,13 @@ namespace WaterConveyorSort.LevelEditorTools
                 if (GUILayout.Button("Vẽ spline"))
                 {
                     draft.Begin(level.Path);
+                    isEditingNodes = false;
+                    message = null;
+                }
+                if (GUILayout.Button(isEditingNodes ? "Dừng chọn node" : "Chọn node"))
+                {
+                    isEditingNodes = !isEditingNodes;
+                    boardView.ReleaseInput();
                     message = null;
                 }
                 return;
@@ -102,11 +141,12 @@ namespace WaterConveyorSort.LevelEditorTools
             {
                 if (GUILayout.Button("Lưu spline"))
                 {
-                    message = LevelPathValidator.Validate(draft.Cells, draft.IsClosed, level);
+                    message = ValidatePath(draft.Cells, draft.IsClosed, level);
                     if (message == null)
                     {
                         writer.SavePath(draft.Cells, draft.IsClosed);
                         draft.Cancel();
+                        selectedNodeIndex = -1;
                         boardView.ReleaseInput();
                     }
                 }
@@ -126,6 +166,24 @@ namespace WaterConveyorSort.LevelEditorTools
                     if (GUILayout.Button("Xóa bản nháp")) draft.Clear();
                 }
             }
+        }
+
+        private void SelectOrCreateNode(LevelDataSO level, Vector2Int cell)
+        {
+            int existing = FindNodeIndex(level, cell);
+            if (existing >= 0)
+            {
+                selectedNodeIndex = existing;
+                return;
+            }
+
+            if (!CanPlaceNode(level, cell))
+            {
+                message = "Node phải nằm sát đường spline và không được đè lên spline.";
+                return;
+            }
+
+            selectedNodeIndex = writer.EnsureNodeAt(cell);
         }
     }
 }

@@ -7,10 +7,12 @@ namespace WaterConveyorSort.LevelData
     [CreateAssetMenu(fileName = "LevelData", menuName = "Water Conveyor Sort/Level Data")]
     public sealed class LevelDataSO : ScriptableObject
     {
+        [SerializeField] private ColorDataSO colorData;
         [SerializeField] private BoardData board = new BoardData();
         [SerializeField] private PathData path = new PathData();
         [SerializeField] private List<BuoyNodeData> buoyNodes = new List<BuoyNodeData>();
 
+        public ColorDataSO ColorData => colorData;
         public BoardData Board => board;
         public PathData Path => path;
         public IReadOnlyList<BuoyNodeData> BuoyNodes => buoyNodes;
@@ -82,11 +84,11 @@ namespace WaterConveyorSort.LevelData
     [Serializable]
     public sealed class BuoyData
     {
-        // The editor will assign an ID from the game's shared color palette.
-        [SerializeField] private string colorId = string.Empty;
+        // The editor assigns this code from ColorDataSO so palette colors can change safely.
+        [SerializeField] private int colorCode;
         [SerializeField] private List<BuoyElementData> elements = new List<BuoyElementData>();
 
-        public string ColorId => colorId;
+        public int ColorCode => colorCode;
         public IReadOnlyList<BuoyElementData> Elements => elements;
     }
 

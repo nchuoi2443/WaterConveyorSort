@@ -6,7 +6,7 @@ using WaterConveyorSort.LevelData;
 namespace WaterConveyorSort.LevelEditorTools
 {
     // Owns draft edits; the asset is untouched until Save is selected.
-    internal sealed class LevelPathDraft
+    public sealed partial class LevelPathDraft
     {
         private readonly List<Vector2Int> cells = new List<Vector2Int>();
         public IReadOnlyList<Vector2Int> Cells => cells;
