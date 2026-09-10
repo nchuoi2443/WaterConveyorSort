@@ -1,0 +1,8 @@
+Shader Graph node plan:
+1. Scene Depth -> Linear01/Raw depth depending graph setting.
+2. Screen Position -> compare against water surface depth.
+3. Custom Function AuroraPopCausticParallax_float for caustic UVs.
+4. Sample T_AuroraPop_Caustics twice, multiply, pow contrast.
+5. Custom Function AuroraPopFoamMask_float for object/edge foam.
+6. Custom Function AuroraPopWaterColor_float outputs BaseColor and Alpha.
+Use Transparent Surface, Alpha Blend, Depth Write Off.
