@@ -361,9 +361,6 @@ MeshRenderer:
   m_ReflectionProbeUsage: 1
   m_RayTracingMode: 2
   m_RayTraceProcedural: 0
-  m_RayTracingAccelStructBuildFlagsOverride: 0
-  m_RayTracingAccelStructBuildFlags: 1
-  m_SmallMeshCulling: 1
   m_RenderingLayerMask: 1
   m_RendererPriority: 0
   m_Materials:
@@ -669,7 +666,8 @@ MonoBehaviour:
       - value: -0.500461
         percent: 0
         ids: 160000001b0000001f000000
-      _mesh: {fileID: 1104676894154187080, guid: 995e4157f97a50d488296808a863aecd, type: 3}
+      _mesh: {fileID: 1104676894154187080, guid: 995e4157f97a50d488296808a863aecd,
+        type: 3}
       _rotation: {x: 0, y: 0, z: 0}
       _offset: {x: 0, y: 0, z: 0}
       _scale: {x: 1, y: 1, z: 1}
