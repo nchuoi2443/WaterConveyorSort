@@ -8,6 +8,9 @@ namespace WaterConveyorSort.LevelEditorTools
     public sealed partial class LevelNodeEditorView
     {
         private const float PaletteNameWidth = 100f;
+        private static readonly string[] OutletLabels = { "Chưa chọn", "Trên (+Y)", "Dưới (-Y)", "Trái (-X)", "Phải (+X)" };
+        private static readonly Vector2Int[] OutletDirections =
+            { Vector2Int.zero, Vector2Int.up, Vector2Int.down, Vector2Int.left, Vector2Int.right };
         private const float PaletteColorWidth = 72f;
         private const float PaletteColorHeight = 24f;
         private int selectedColumnIndex;
@@ -35,6 +38,16 @@ namespace WaterConveyorSort.LevelEditorTools
             }
 
             BuoyNodeData node = level.BuoyNodes[selectedNodeIndex];
+            int outletIndex = System.Array.IndexOf(OutletDirections, node.OutletDirection);
+            EditorGUI.BeginChangeCheck();
+            int selectedOutlet = EditorGUILayout.Popup("Hướng đổ ra", Mathf.Max(0, outletIndex), OutletLabels);
+            if (EditorGUI.EndChangeCheck())
+            {
+                writer.SaveOutletDirection(selectedNodeIndex, OutletDirections[selectedOutlet]);
+                return;
+            }
+            if (node.OutletDirection != Vector2Int.zero)
+                EditorGUILayout.LabelField("Ô conveyor nhận", node.OutletCell.ToString());
             EditorGUILayout.LabelField("Selected Node", $"Node {selectedNodeIndex + 1} - {node.GridPosition}");
 
             using (new EditorGUILayout.HorizontalScope())

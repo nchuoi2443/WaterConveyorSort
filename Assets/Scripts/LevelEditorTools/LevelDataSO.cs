@@ -47,12 +47,16 @@ namespace WaterConveyorSort.LevelData
     public sealed class BuoyNodeData
     {
         [SerializeField] private Vector2Int gridPosition;
+        // Cardinal grid direction toward the receiving conveyor cell. Zero means unconfigured.
+        [SerializeField] private Vector2Int outletDirection;
         [SerializeField] private List<BuoyColumnData> columns = new List<BuoyColumnData>
         {
             new BuoyColumnData()
         };
 
         public Vector2Int GridPosition => gridPosition;
+        public Vector2Int OutletDirection => outletDirection;
+        public Vector2Int OutletCell => gridPosition + outletDirection;
         public IReadOnlyList<BuoyColumnData> Columns => columns;
     }
 

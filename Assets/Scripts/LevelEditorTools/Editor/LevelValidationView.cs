@@ -55,6 +55,18 @@ namespace WaterConveyorSort.LevelEditorTools
             for (int nodeIndex = 0; nodeIndex < level.BuoyNodes.Count; nodeIndex++)
             {
                 BuoyNodeData node = level.BuoyNodes[nodeIndex];
+                var direction = node.OutletDirection;
+                if (direction != UnityEngine.Vector2Int.up && direction != UnityEngine.Vector2Int.down &&
+                    direction != UnityEngine.Vector2Int.left && direction != UnityEngine.Vector2Int.right)
+                    errors.Add($"Node {nodeIndex + 1}: select a cardinal outlet direction.");
+                else
+                {
+                    bool onPath = false;
+                    foreach (var cell in level.Path.Cells)
+                        if (cell == node.OutletCell) { onPath = true; break; }
+                    if (!Contains(node.OutletCell, level.Board.Width, level.Board.Height) || !onPath)
+                        errors.Add($"Node {nodeIndex + 1}: outlet cell {node.OutletCell} must be a conveyor cell inside the board.");
+                }
                 if (!Contains(node.GridPosition, level.Board.Width, level.Board.Height))
                     errors.Add($"Node {nodeIndex + 1} nằm ngoài board.");
                 if (!nodePositions.Add(node.GridPosition))

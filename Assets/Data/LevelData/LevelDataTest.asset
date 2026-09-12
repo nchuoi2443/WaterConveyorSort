@@ -46,6 +46,7 @@ MonoBehaviour:
     - {x: 1, y: 4}
   buoyNodes:
   - gridPosition: {x: 4, y: 6}
+    outletDirection: {x: 0, y: 1}
     columns:
     - columnType: 0
       columnTypeCount: 0
@@ -96,6 +97,7 @@ MonoBehaviour:
         buoyTypeCount: 0
         elements: []
   - gridPosition: {x: 6, y: 8}
+    outletDirection: {x: 0, y: -1}
     columns:
     - columnType: 0
       columnTypeCount: 0
@@ -122,6 +124,7 @@ MonoBehaviour:
         buoyTypeCount: 0
         elements: []
   - gridPosition: {x: 6, y: 3}
+    outletDirection: {x: -1, y: 0}
     columns:
     - columnType: 0
       columnTypeCount: 0
@@ -172,6 +175,7 @@ MonoBehaviour:
         buoyTypeCount: 0
         elements: []
   - gridPosition: {x: 2, y: 0}
+    outletDirection: {x: 0, y: 1}
     columns:
     - columnType: 0
       columnTypeCount: 0

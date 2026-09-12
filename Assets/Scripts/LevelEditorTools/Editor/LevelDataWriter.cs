@@ -52,6 +52,7 @@ namespace WaterConveyorSort.LevelEditorTools
             nodes.InsertArrayElementAtIndex(index);
             SerializedProperty node = nodes.GetArrayElementAtIndex(index);
             node.FindPropertyRelative("gridPosition").vector2IntValue = gridPosition;
+            node.FindPropertyRelative("outletDirection").vector2IntValue = Vector2Int.zero;
 
             SerializedProperty columns = node.FindPropertyRelative("columns");
             columns.arraySize = 1;
@@ -80,6 +81,18 @@ namespace WaterConveyorSort.LevelEditorTools
 
             nodes.GetArrayElementAtIndex(nodeIndex).FindPropertyRelative("gridPosition").vector2IntValue = gridPosition;
             Commit("Move Buoy Node");
+        }
+
+        public void SaveOutletDirection(int nodeIndex, Vector2Int direction)
+        {
+            if (direction != Vector2Int.zero && direction != Vector2Int.up &&
+                direction != Vector2Int.down && direction != Vector2Int.left && direction != Vector2Int.right)
+                throw new System.ArgumentException("Outlet direction must be cardinal or unconfigured.", nameof(direction));
+            serialized.Update();
+            SerializedProperty nodes = serialized.FindProperty("buoyNodes");
+            if (nodeIndex < 0 || nodeIndex >= nodes.arraySize) return;
+            nodes.GetArrayElementAtIndex(nodeIndex).FindPropertyRelative("outletDirection").vector2IntValue = direction;
+            Commit("Edit Node Outlet Direction");
         }
 
         public void ReorderNode(int nodeIndex, int offset)

@@ -22,6 +22,7 @@ Each prefab has its corresponding Visual component with references to your autho
 BuoyVisual colors only assigned renderers through the URP _BaseColor property, without changing shared materials.
 BuoyStackVisual controls the first buoy offset and vertical spacing.
 BuoyStackHolderVisual selects single/multiple decorations and controls the first stack offset and queue direction/spacing. Keep decorative roots separate from stackRoot.
+The holder passes OutletDirection to its Visual, which rotates local +Z toward the outlet in board coordinates. Up/right/down/left map to Y rotations of 0/90/180/-90 degrees. Unconfigured nodes keep identity rotation. Keep stackRoot under the holder with identity local rotation to align the stack queue; offset model orientation on a decorative child if needed. The default negative-Z stackStep places waiting stacks behind the outlet-facing stack.
 Holder positions and conveyor points share BoardCoordinates and BoardData.CellSize. Keep boardRoot and its ancestors at unit scale for world-unit sizing.
 The conveyor channel configuration is untouched.
 

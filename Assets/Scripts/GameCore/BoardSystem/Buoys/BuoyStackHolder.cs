@@ -12,6 +12,8 @@ namespace WaterConveyorSort.BoardSystem.Buoys
         public IReadOnlyList<BuoyStack> Stacks { get; }
         public BuoyStack ActiveStack => stacks.Count > 0 ? stacks[0] : null;
         public Vector2Int GridPosition { get; }
+        public Vector2Int OutletDirection { get; }
+        public Vector2Int OutletCell => GridPosition + OutletDirection;
 
         public BuoyStackHolder(BuoyNodeData source, BuoyStackHolderVisual visual)
         {
@@ -22,6 +24,8 @@ namespace WaterConveyorSort.BoardSystem.Buoys
             this.visual = visual;
             Stacks = stacks.AsReadOnly();
             GridPosition = source.GridPosition;
+            OutletDirection = source.OutletDirection;
+            visual.SetOutletDirection(OutletDirection);
             visual.Refresh(source.Columns.Count);
         }
 
