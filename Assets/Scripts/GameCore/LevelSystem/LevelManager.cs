@@ -21,8 +21,10 @@ namespace WaterConveyorSort.LevelSystem
                 throw new InvalidOperationException("LevelManager requires level data.");
             if (boardManager == null)
                 throw new InvalidOperationException("LevelManager requires a BoardManager.");
+            if (levelData.BuoyNodes.Count > 0 && levelData.ColorData == null)
+                throw new InvalidOperationException($"Level '{levelData.name}' has no ColorDataSO assigned. Assign Color Data on the level asset.");
 
-            boardManager.InitBoard(levelData.Board, levelData.Path);
+            boardManager.InitBoard(levelData.Board, levelData.Path, levelData.BuoyNodes, levelData.ColorData);
         }
     }
 }

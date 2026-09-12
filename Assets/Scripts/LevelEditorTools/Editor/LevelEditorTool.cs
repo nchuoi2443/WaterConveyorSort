@@ -46,6 +46,7 @@ namespace WaterConveyorSort.LevelEditorTools
             var level = (LevelDataSO)target;
             ColorDataSO colorData = ResolveColorData(level);
             DrawColorSettings(level, colorData);
+            colorData = level.ColorData;
             DrawBoardSettings(level);
             EditorGUILayout.Space();
             DrawToolbar(level);
@@ -93,15 +94,17 @@ namespace WaterConveyorSort.LevelEditorTools
         {
             EditorGUILayout.LabelField("Color Settings", EditorStyles.boldLabel);
             EditorGUI.BeginChangeCheck();
-            var colorData = (ColorDataSO)EditorGUILayout.ObjectField("Color Data Override", level.ColorData,
+            var colorData = (ColorDataSO)EditorGUILayout.ObjectField("Color Data", level.ColorData,
                 typeof(ColorDataSO), false);
             if (EditorGUI.EndChangeCheck())
                 writer.SaveColorData(colorData);
 
             using (new EditorGUI.DisabledScope(true))
             {
-                EditorGUILayout.ObjectField("Active Color Data", resolvedColorData, typeof(ColorDataSO), false);
+                EditorGUILayout.ObjectField("Active Color Data", level.ColorData, typeof(ColorDataSO), false);
             }
+            if (level.ColorData == null)
+                EditorGUILayout.HelpBox("Assign a Color Data asset. A default is assigned automatically only when the color folder contains exactly one palette.", MessageType.Warning);
         }
 
         private void DrawBoardSettings(LevelDataSO level)

@@ -12,7 +12,7 @@ MonoBehaviour:
   m_Script: {fileID: 11500000, guid: b3a37c95b2be0e4449c5aef645af94d7, type: 3}
   m_Name: LevelDataTest
   m_EditorClassIdentifier: 
-  colorData: {fileID: 0}
+  colorData: {fileID: 11400000, guid: 7ad8e8d7e090ce746b7c062ec44f7472, type: 2}
   board:
     width: 10
     height: 10

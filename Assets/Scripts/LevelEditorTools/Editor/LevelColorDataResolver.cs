@@ -13,11 +13,15 @@ namespace WaterConveyorSort.LevelEditorTools
                 return level.ColorData;
 
             string[] guids = AssetDatabase.FindAssets("t:ColorDataSO", new[] { ColorDataFolder });
-            if (guids.Length == 0)
+            if (guids.Length != 1)
                 return null;
 
             string path = AssetDatabase.GUIDToAssetPath(guids[0]);
-            return AssetDatabase.LoadAssetAtPath<ColorDataSO>(path);
+            ColorDataSO colors = AssetDatabase.LoadAssetAtPath<ColorDataSO>(path);
+            // Persist the default palette so runtime uses the same data as the editor.
+            if (colors != null)
+                writer.SaveColorData(colors);
+            return colors;
         }
     }
 }

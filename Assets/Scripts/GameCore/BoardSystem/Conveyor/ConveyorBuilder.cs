@@ -24,10 +24,7 @@ namespace WaterConveyorSort.BoardSystem.Conveyor
             for (int i = 0; i < points.Length; i++)
             {
                 Vector2Int cell = pathData.Cells[i];
-                Vector3 localPosition = new Vector3(
-                    (cell.x - (boardData.Width - 1) * 0.5f) * boardData.CellSize,
-                    0f,
-                    (cell.y - (boardData.Height - 1) * 0.5f) * boardData.CellSize);
+                Vector3 localPosition = BoardCoordinates.CellToLocal(boardData, cell);
 
                 points[i] = new SplinePoint(boardRoot.TransformPoint(localPosition))
                 {
