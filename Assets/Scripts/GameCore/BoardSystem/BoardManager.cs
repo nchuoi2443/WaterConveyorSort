@@ -4,6 +4,7 @@ using UnityEngine;
 using WaterConveyorSort.BoardSystem.Conveyor;
 using WaterConveyorSort.BoardSystem.Buoys;
 using WaterConveyorSort.LevelData;
+using WaterConveyorSort.InputHandling;
 
 namespace WaterConveyorSort.BoardSystem
 {
@@ -15,6 +16,8 @@ namespace WaterConveyorSort.BoardSystem
         [SerializeField] private BuoyVisual buoyPrefab;
         [SerializeField] private BuoyStackVisual buoyStackPrefab;
         [SerializeField] private BuoyStackHolderVisual buoyStackHolderPrefab;
+
+        [SerializeField] private InputSystem inputSystem;
 
         private readonly BuoyStackHolderController buoyStackHolderController = new BuoyStackHolderController();
 
@@ -29,9 +32,12 @@ namespace WaterConveyorSort.BoardSystem
                 (buoyPrefab == null || buoyStackPrefab == null || buoyStackHolderPrefab == null))
                 throw new InvalidOperationException("Assign all three buoy prefabs on BoardManager.");
 
+            if (inputSystem == null) inputSystem = GetComponent<InputSystem>();
+            if (inputSystem == null) inputSystem = gameObject.AddComponent<InputSystem>();
+
             conveyorController.InitConveyor(boardData, pathData, boardRoot);
             buoyStackHolderController.InitHolders(boardData, nodes, colors, boardRoot,
-                buoyStackHolderPrefab, buoyStackPrefab, buoyPrefab);
+                buoyStackHolderPrefab, buoyStackPrefab, buoyPrefab, inputSystem);
         }
 
         private void OnDestroy()

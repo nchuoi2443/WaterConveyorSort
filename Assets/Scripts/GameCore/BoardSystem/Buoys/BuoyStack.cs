@@ -1,5 +1,6 @@
 using System;
 using System.Collections.Generic;
+using UnityEngine;
 using WaterConveyorSort.LevelData;
 
 namespace WaterConveyorSort.BoardSystem.Buoys
@@ -8,6 +9,10 @@ namespace WaterConveyorSort.BoardSystem.Buoys
     {
         private readonly BuoyStackVisual visual;
         private readonly List<Buoy> buoys = new List<Buoy>();
+        private bool cleared;
+        public bool CanReceiveInput { get; set; } = true;
+        public event Action<BuoyStack> Clicked;
+
         public IReadOnlyList<Buoy> Buoys { get; }
         public ColumnElementType Type { get; }
         public int TypeCount { get; }
@@ -33,8 +38,19 @@ namespace WaterConveyorSort.BoardSystem.Buoys
             visual.PlaceBuoy(buoy.Visual.transform, buoys.Count - 1);
         }
 
+        public void OnClick()
+        {
+            if (cleared || !CanReceiveInput) return;
+            Debug.Log($"Stack clicked: BuoyCount={buoys.Count}, Type={Type}, TypeCount={TypeCount}", visual);
+            Clicked?.Invoke(this);
+        }
+
         public void Clear()
         {
+            if (cleared) return;
+            cleared = true;
+            CanReceiveInput = false;
+            Clicked = null;
             foreach (Buoy buoy in buoys) buoy.Clear();
             buoys.Clear();
             if (visual != null) visual.Release();

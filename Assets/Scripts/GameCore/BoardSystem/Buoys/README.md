@@ -28,6 +28,20 @@ The conveyor channel configuration is untouched.
 
 ## Manual verification in Unity
 
+### Input
+
+BoardManager resolves or creates an InputSystem component during initialization. For Inspector configuration, add the component before entering Play Mode and assign its camera, raycast mask and distance. Without an assigned camera it uses Camera.main.
+
+BuoyStackVisual implements IInputReceiver. The controller binds each stack visual to its BuoyStack and InputSystem before spawning its buoys. Assign Input Colliders on the stack visual; an empty array uses colliders on the same GameObject only, so individual buoy colliders are never collected. RingStack.prefab explicitly references its enabled, non-trigger capsule collider on the Buoy layer. Ring.prefab's mesh collider is disabled.
+
+Mouse down or the primary touch beginning dispatches one stack click. UI GraphicRaycaster hits block board input when an EventSystem is present. Disabling the stack visual unregisters its colliders; enabling registers them again. Clearing a stack releases its registration and click subscribers.
+
+Subscribe to BuoyStack.Clicked for gameplay behavior and use BuoyStack.CanReceiveInput to lock interaction. Clicks currently log the stack information; selecting or transferring its top buoy remains a gameplay responsibility. Buoy and BuoyVisual no longer handle input.
+
+- Verify clicking different parts of a stack produces one Stack clicked log per press, including touch on a device.
+- Verify UI blocks the click and CanReceiveInput = false prevents dispatch.
+- Disable and re-enable a stack visual, then reinitialize the board: only active, current stacks should receive input.
+
 - One column: one holder, one stack, matching buoy count and bottom-to-top colors.
 - Three columns including an empty column: three stacks in source order, with no buoys on the empty stack.
 - Reinitialize in Play Mode: old spawned holders are hidden immediately and destroyed; counts do not accumulate.

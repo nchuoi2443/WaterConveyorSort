@@ -194,6 +194,8 @@ MonoBehaviour:
   buoyRoot: {fileID: 6607633801162913000}
   firstBuoyOffset: {x: 0, y: 0.2, z: 0}
   buoySpacing: 0.2
+  inputColliders:
+  - {fileID: 8188284399684651852}
 --- !u!1 &489380299600511050
 GameObject:
   m_ObjectHideFlags: 0

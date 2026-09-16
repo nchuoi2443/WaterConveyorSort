@@ -2,6 +2,7 @@ using System;
 using System.Collections.Generic;
 using UnityEngine;
 using WaterConveyorSort.LevelData;
+using WaterConveyorSort.InputHandling;
 using Object = UnityEngine.Object;
 
 namespace WaterConveyorSort.BoardSystem.Buoys
@@ -18,8 +19,9 @@ namespace WaterConveyorSort.BoardSystem.Buoys
 
         public void InitHolders(BoardData board, IReadOnlyList<BuoyNodeData> nodes,
             ColorDataSO colors, Transform boardRoot,
-            BuoyStackHolderVisual holderPrefab, BuoyStackVisual stackPrefab, BuoyVisual buoyPrefab)
+            BuoyStackHolderVisual holderPrefab, BuoyStackVisual stackPrefab, BuoyVisual buoyPrefab, InputSystem inputSystem)
         {
+            if (inputSystem == null) throw new ArgumentNullException(nameof(inputSystem));
             if (board == null) throw new ArgumentNullException(nameof(board));
             if (nodes == null) throw new ArgumentNullException(nameof(nodes));
             if (boardRoot == null) throw new ArgumentNullException(nameof(boardRoot));
@@ -47,7 +49,7 @@ namespace WaterConveyorSort.BoardSystem.Buoys
                         holders.Add(holder);
                         // Spawn every column for now; queue advancement will be implemented separately.
                         for (int i = 0; i < node.Columns.Count; i++)
-                            CreateStack(holder, visual.transform, node.Columns[i], i, colors, stackPrefab, buoyPrefab);
+                            CreateStack(holder, visual.transform, node.Columns[i], i, colors, stackPrefab, buoyPrefab, inputSystem);
                     }
                     catch { visual.Release(); throw; }
                 }
@@ -56,7 +58,7 @@ namespace WaterConveyorSort.BoardSystem.Buoys
         }
 
         private static void CreateStack(BuoyStackHolder holder, Transform parent, BuoyColumnData source,
-            int index, ColorDataSO colors, BuoyStackVisual stackPrefab, BuoyVisual buoyPrefab)
+            int index, ColorDataSO colors, BuoyStackVisual stackPrefab, BuoyVisual buoyPrefab, InputSystem inputSystem)
         {
             BuoyStackVisual visual = Object.Instantiate(stackPrefab, parent);
             try
@@ -64,6 +66,7 @@ namespace WaterConveyorSort.BoardSystem.Buoys
                 visual.name = $"Stack_{index}";
                 var stack = new BuoyStack(source, visual);
                 holder.AddStack(stack, visual);
+                visual.BindInput(stack, inputSystem);
                 for (int i = 0; i < source.Buoys.Count; i++)
                 {
                     BuoyVisual buoyVisual = Object.Instantiate(buoyPrefab, visual.transform);

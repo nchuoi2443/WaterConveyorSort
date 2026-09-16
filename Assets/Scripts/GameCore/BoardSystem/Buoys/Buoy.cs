@@ -13,6 +13,7 @@ namespace WaterConveyorSort.BoardSystem.Buoys
         public int TypeCount { get; }
         public IReadOnlyList<string> Elements { get; }
         internal BuoyVisual Visual => visual;
+        private bool cleared;
 
         public Buoy(BuoyData source, ColorDataSO colors, BuoyVisual visual)
         {
@@ -34,6 +35,8 @@ namespace WaterConveyorSort.BoardSystem.Buoys
 
         public void Clear()
         {
+            if (cleared) return;
+            cleared = true;
             if (visual != null) visual.Release();
         }
     }
