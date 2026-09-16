@@ -30,7 +30,7 @@ namespace WaterConveyorSort.BoardSystem.Buoys
             var elements = new List<string>();
             foreach (var element in source.Elements) elements.Add(element.ElementId);
             Elements = elements.AsReadOnly();
-            visual.Refresh(color);
+            visual.Refresh(ColorCode, color);
         }
 
         public void Clear()

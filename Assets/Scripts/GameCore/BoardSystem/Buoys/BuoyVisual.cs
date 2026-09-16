@@ -6,11 +6,25 @@ namespace WaterConveyorSort.BoardSystem.Buoys
     {
         [Tooltip("Only renderers which should receive the buoy color.")]
         [SerializeField] private Renderer[] colorRenderers;
+        [SerializeField] private BuoyColorConfig colorConfig;
         private MaterialPropertyBlock propertyBlock;
-        private static readonly int BaseColor = Shader.PropertyToID("_BaseColor");
+        private static readonly int BaseColor = Shader.PropertyToID("_Color");
 
-        public void Refresh(Color color)
+        public void Refresh(int colorId, Color color)
         {
+            if (colorConfig != null)
+            {
+                Material material = colorConfig.GetMaterial(colorId);
+                if (colorRenderers == null) return;
+                foreach (Renderer target in colorRenderers)
+                {
+                    if (target == null) continue;
+                    target.SetPropertyBlock(null);
+                    target.sharedMaterial = material;
+                }
+                return;
+            }
+
             propertyBlock ??= new MaterialPropertyBlock();
             if (colorRenderers == null) return;
             foreach (Renderer target in colorRenderers)

@@ -19,7 +19,7 @@ Buoy and BuoyStack directly hold copied values and element IDs from the level as
 ## Visual configuration
 
 Each prefab has its corresponding Visual component with references to your authored models.
-BuoyVisual colors only assigned renderers through the URP _BaseColor property, without changing shared materials.
+BuoyVisual colors only assigned renderers through MaterialPropertyBlock using the Ring shader's _Color property, without changing shared materials or creating material instances. The Ring shader is unchanged; this does not add GPU instancing support to it.
 BuoyStackVisual controls the first buoy offset and vertical spacing.
 BuoyStackHolderVisual selects single/multiple decorations and controls the first stack offset and queue direction/spacing. Keep decorative roots separate from stackRoot.
 The holder passes OutletDirection to its Visual, which rotates local +Z toward the outlet in board coordinates. Up/right/down/left map to Y rotations of 0/90/180/-90 degrees. Unconfigured nodes keep identity rotation. Keep stackRoot under the holder with identity local rotation to align the stack queue; offset model orientation on a decorative child if needed. The default negative-Z stackStep places waiting stacks behind the outlet-facing stack.
