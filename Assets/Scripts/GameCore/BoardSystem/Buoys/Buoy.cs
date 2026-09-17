@@ -33,6 +33,8 @@ namespace WaterConveyorSort.BoardSystem.Buoys
             visual.Refresh(ColorCode, color);
         }
 
+        internal void Consume() => visual.gameObject.SetActive(false);
+
         public void Clear()
         {
             if (cleared) return;

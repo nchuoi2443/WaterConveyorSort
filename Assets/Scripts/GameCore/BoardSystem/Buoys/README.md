@@ -116,7 +116,7 @@ Configure holder receiving directly on LevelManager under Conveyor To Stack: Rec
 
 ## Stack queue at conveyor exit
 
-LevelDataSO.MaxStackInStackQueue sets the number of initially empty queue stacks (default 3). The level asset's custom inspector exposes this in Stack Queue / Max Stack In Stack Queue. There is no per-stack buoy limit and no consume logic yet.
+LevelDataSO.MaxStackInStackQueue sets the number of initially empty queue stacks (default 3). The level asset's custom inspector exposes this in Stack Queue / Max Stack In Stack Queue. There is no per-stack buoy limit. After an incoming group finishes landing, both holder and queue stacks consume matching top buoys in batches of five. Consuming removes them from the active list and disables their GameObjects; disabled buoys are released when the stack is cleared. Remaining receive reservations are rebased and queue counts are reduced before input resumes.
 
 SampleScene includes StackQueue and StackQueueExit under the board root. StackQueue has a separate StackQueueSpawnRoot centered on the row. StackQueueVisual exposes Stack Spacing, Receive Flight Duration and Receive Launch Delay as serialized fields. Spacing is measured center-to-center along the spawn root's local X. With N stacks, stack i uses x = (i - (N - 1) * 0.5) * spacing. Move/rotate the root to position the entire row. Queue stacks bind to the board InputSystem and retain a short visible pole while empty. Tap exports the consecutive top color group to the last authored conveyor node (the start of backward movement), using normal entry spacing and group capacity. Input is locked during incoming/outgoing flights. Incoming groups can reserve the vacated slots while export is pending; their flights start after export completes. Departure groups ignore the queue exit until they leave its trigger.
 
@@ -133,7 +133,7 @@ Verify in Play Mode:
 - Send different colors before prior flights land; reserve separate stacks, never mix colors.
 - Send same-color groups with different receive timing values; commit without overlapping slots.
 - Fill every stack with a different color, then send a new color; trigger Lost once and freeze gameplay.
-- Receive more than five buoys of one color; keep them until consume is implemented later.
+- Receive 12 buoys of one color; consume two batches of five and leave two. Verify mixed top colors do not consume and simultaneous incoming groups still land after reservations are rebased.
 - Reset during multiple queue flights or after a loss; clear all stacks/reservations and resume input.
 
 Empty Stack Height on BuoyStackVisual sets the default pole height only when there are no buoys. Queue spawning uses this prefab value directly. Once buoys land, pole height follows buoy count and spacing. Changing the value in Play Mode refreshes the visual; empty stacks remain non-clickable.

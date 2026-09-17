@@ -9,6 +9,7 @@ namespace WaterConveyorSort.BoardSystem.Buoys
     {
         private readonly BuoyStackVisual visual;
         private readonly List<Buoy> buoys = new List<Buoy>();
+        private readonly List<Buoy> consumedBuoys = new List<Buoy>();
         private bool cleared;
         internal BuoyStackVisual Visual => visual;
         private bool canReceiveInput;
@@ -32,6 +33,31 @@ namespace WaterConveyorSort.BoardSystem.Buoys
             buoys.RemoveAt(buoys.Count - 1);
             visual.RefreshHeight(buoys.Count);
         }
+        internal int ConsumeTopGroups()
+        {
+            const int groupSize = 5;
+            int consumed = 0;
+            while (!cleared && buoys.Count >= groupSize)
+            {
+                int top = buoys.Count - 1;
+                int color = buoys[top].ColorCode;
+                bool matches = true;
+                for (int i = 1; i < groupSize; i++)
+                    if (buoys[top - i].ColorCode != color) { matches = false; break; }
+                if (!matches) break;
+                for (int i = 0; i < groupSize; i++)
+                {
+                    Buoy buoy = buoys[buoys.Count - 1];
+                    buoys.RemoveAt(buoys.Count - 1);
+                    buoy.Consume();
+                    consumedBuoys.Add(buoy);
+                }
+                consumed += groupSize;
+            }
+            if (consumed > 0) visual.RefreshHeight(buoys.Count);
+            return consumed;
+        }
+
         public event Action<BuoyStack> Clicked;
 
         public IReadOnlyList<Buoy> Buoys { get; }
@@ -75,6 +101,8 @@ namespace WaterConveyorSort.BoardSystem.Buoys
             Clicked = null;
             foreach (Buoy buoy in buoys) buoy.Clear();
             buoys.Clear();
+            foreach (Buoy buoy in consumedBuoys) buoy.Clear();
+            consumedBuoys.Clear();
             if (visual != null) visual.Release();
         }
     }

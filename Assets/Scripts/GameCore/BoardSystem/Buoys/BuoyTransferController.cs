@@ -27,11 +27,11 @@ namespace WaterConveyorSort.BoardSystem.Buoys
             BeginReceive(stack, group, stack.Buoys.Count, completed);
         }
         internal void BeginReceive(BuoyStack stack, ConveyorBuoyGroup group, int baseIndex,
-            Action completed, float? duration = null, float? delay = null)
+            Action completed, float? duration = null, float? delay = null, Action<int> consumed = null)
         {
             if (IsPaused || group.IsReceiving) throw new InvalidOperationException("The group cannot start another receive transfer.");
             group.IsReceiving = true;
-            var transfer = new ReceiveTransfer { Stack = stack, Group = group, Completed = completed,
+            var transfer = new ReceiveTransfer { Stack = stack, Group = group, Completed = completed, Consumed = consumed,
                 BaseIndex = baseIndex, Count = group.Buoys.Count,
                 Duration = Mathf.Max(0.01f, duration ?? receiveFlightDuration),
                 Delay = Mathf.Max(0f, delay ?? receiveLaunchDelay) };
@@ -142,6 +142,14 @@ namespace WaterConveyorSort.BoardSystem.Buoys
                 if (transfer.Arrived != transfer.Count) continue;
                 receives.RemoveAt(i);
                 conveyor.RemoveGroup(transfer.Group);
+                int consumed = transfer.Stack.ConsumeTopGroups();
+                if (consumed > 0)
+                {
+                    // Keep later reserved destinations aligned after removing top buoys.
+                    foreach (ReceiveTransfer pending in receives)
+                        if (pending.Stack == transfer.Stack) pending.BaseIndex -= consumed;
+                    transfer.Consumed?.Invoke(consumed);
+                }
                 transfer.Completed?.Invoke();
             }
         }
@@ -169,6 +177,7 @@ namespace WaterConveyorSort.BoardSystem.Buoys
         }
         private sealed class ReceiveTransfer
         {
+            public Action<int> Consumed;
             public BuoyStack Stack;
             public ConveyorBuoyGroup Group;
             public Action Completed;

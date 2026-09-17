@@ -328,6 +328,7 @@ class Buoy {
     ~BuoyVisual Visual
     -bool cleared
     +Buoy(BuoyData source, ColorDataSO colors, BuoyVisual visual)
+    ~Consume() void
     +Clear() void
 }
 class BuoyColorConfig {
@@ -348,12 +349,14 @@ class ColorMaterialEntry {
 class BuoyStack {
     -BuoyStackVisual visual
     -List~Buoy~ buoys
+    -List~Buoy~ consumedBuoys
     -bool cleared
     ~BuoyStackVisual Visual
     -bool canReceiveInput
     +bool CanReceiveInput
     +GetTopGroup() List~Buoy~
     ~RemoveTop(Buoy buoy) void
+    ~ConsumeTopGroups() int
     +Action~BuoyStack~ Clicked
     +IReadOnlyList~Buoy~ Buoys
     +ColumnElementType Type
@@ -492,6 +495,7 @@ public IReadOnlyList<string> Elements { get; }
 internal BuoyVisual Visual => visual;
 private bool cleared;
 public Buoy(BuoyData source, ColorDataSO colors, BuoyVisual visual)
+internal void Consume()
 public void Clear()
 ```
 
@@ -529,12 +533,14 @@ Source: [Assets/Scripts/GameCore/BoardSystem/Buoys/BuoyStack.cs](../Assets/Scrip
 ```csharp
 private readonly BuoyStackVisual visual;
 private readonly List<Buoy> buoys = new List<Buoy>();
+private readonly List<Buoy> consumedBuoys = new List<Buoy>();
 private bool cleared;
 internal BuoyStackVisual Visual => visual;
 private bool canReceiveInput;
 public bool CanReceiveInput { get; set; }
 public List<Buoy> GetTopGroup()
 internal void RemoveTop(Buoy buoy)
+internal int ConsumeTopGroups()
 public event Action<BuoyStack> Clicked;
 public IReadOnlyList<Buoy> Buoys { get; }
 public ColumnElementType Type { get; }
@@ -1113,7 +1119,7 @@ class BuoyTransferController {
     +SetReceiveSettings(float duration, float delay) void
     +BuoyTransferController(ConveyorController conveyor)
     ~BeginReceive(BuoyStack stack, ConveyorBuoyGroup group, Action completed) void
-    ~BeginReceive(BuoyStack stack, ConveyorBuoyGroup group, int baseIndex, Action completed, float? duration = null, float? delay = null) void
+    ~BeginReceive(BuoyStack stack, ConveyorBuoyGroup group, int baseIndex, Action completed, float? duration = null, float? delay = null, Action~int~ consumed = null) void
     +Begin(BuoyStack stack, Vector2Int outlet, BuoyStackHolder sourceHolder, Action completed) void
     ~BeginFromQueue(BuoyStack stack, Action completed, Action~ConveyorBuoyGroup~ departing) void
     -BeginExport(BuoyStack stack, BuoyStackHolder sourceHolder, Action completed, Action~float, Func~Vector3_float~, Action~ConveyorBuoyGroup~~ requestEntry, Action~ConveyorBuoyGroup~ departing = null) void
@@ -1132,6 +1138,7 @@ class Transfer {
     +float Timer, Elapsed, ExpectedArrival
 }
 class ReceiveTransfer {
+    +Action~int~ Consumed
     +BuoyStack Stack
     +ConveyorBuoyGroup Group
     +Action Completed
@@ -1174,7 +1181,7 @@ public void SetPaused(bool paused)
 public void SetReceiveSettings(float duration, float delay)
 public BuoyTransferController(ConveyorController conveyor)
 internal void BeginReceive(BuoyStack stack, ConveyorBuoyGroup group, Action completed)
-internal void BeginReceive(BuoyStack stack, ConveyorBuoyGroup group, int baseIndex, Action completed, float? duration = null, float? delay = null)
+internal void BeginReceive(BuoyStack stack, ConveyorBuoyGroup group, int baseIndex, Action completed, float? duration = null, float? delay = null, Action<int> consumed = null)
 public void Begin(BuoyStack stack, Vector2Int outlet, BuoyStackHolder sourceHolder, Action completed)
 internal void BeginFromQueue(BuoyStack stack, Action completed, Action<ConveyorBuoyGroup> departing)
 private void BeginExport(BuoyStack stack, BuoyStackHolder sourceHolder, Action completed, Action<float, Func<Vector3, float>, Action<ConveyorBuoyGroup>> requestEntry, Action<ConveyorBuoyGroup> departing = null)
@@ -1203,6 +1210,7 @@ public float Timer, Elapsed, ExpectedArrival;
 Source: [Assets/Scripts/GameCore/BoardSystem/Buoys/BuoyTransferController.cs](../Assets/Scripts/GameCore/BoardSystem/Buoys/BuoyTransferController.cs).
 
 ```csharp
+public Action<int> Consumed;
 public BuoyStack Stack;
 public ConveyorBuoyGroup Group;
 public Action Completed;
@@ -1673,7 +1681,8 @@ public List<Vector3> data;
 - Queue stacks accept taps after incoming flights finish. A tap exports the top color group to the last authored path node, at the start of backward movement. Export locks taps and reserves vacated slots; incoming flights wait until export finishes. DepartureExit prevents an immediate return while inside the source exit trigger.
 - Queue reservations claim colors and landing indices immediately; overlapping same-color transfers commit in global stack order.
 - Open conveyors notify ReachedEnd once per loaded group. StackQueueExit provides a configurable trigger for open or closed paths. Accepted queue groups release path occupancy immediately and launch from the exit.
-- No eligible queue stack triggers LevelManager.HasLost/Lost once and pauses input, conveyor and transfers. Consume is not implemented.
+- No eligible queue stack triggers LevelManager.HasLost/Lost once and pauses input, conveyor and transfers.
+- After each incoming group finishes, matching top buoys are consumed in batches of five. Consumed buoy visuals are disabled and removed from active stack contents; remaining receive destinations and queue counts are rebased. An exhausted holder advances or disables.
 - Reset cancels queue tweens and clears flying buoys before destroying stacks/groups.
 
 ## Web viewing

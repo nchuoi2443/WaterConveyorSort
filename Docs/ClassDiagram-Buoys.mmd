@@ -9,6 +9,7 @@ class Buoy {
     ~BuoyVisual Visual
     -bool cleared
     +Buoy(BuoyData source, ColorDataSO colors, BuoyVisual visual)
+    ~Consume() void
     +Clear() void
 }
 class BuoyColorConfig {
@@ -29,12 +30,14 @@ class ColorMaterialEntry {
 class BuoyStack {
     -BuoyStackVisual visual
     -List~Buoy~ buoys
+    -List~Buoy~ consumedBuoys
     -bool cleared
     ~BuoyStackVisual Visual
     -bool canReceiveInput
     +bool CanReceiveInput
     +GetTopGroup() List~Buoy~
     ~RemoveTop(Buoy buoy) void
+    ~ConsumeTopGroups() int
     +Action~BuoyStack~ Clicked
     +IReadOnlyList~Buoy~ Buoys
     +ColumnElementType Type
