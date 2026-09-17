@@ -94,6 +94,18 @@ namespace WaterConveyorSort.BoardSystem.Conveyor
                 points[i] = a;
                 points[next] = b;
             }
+            if (!path.IsClosed)
+            {
+                // Dreamteck evaluates the last point's outgoing handle at exactly percent 1.
+                // Extend the endpoint handles to provide a valid forward direction there.
+                SplinePoint first = points[0];
+                first.tangent = first.position - (first.tangent2 - first.position);
+                points[0] = first;
+                int lastIndex = points.Count - 1;
+                SplinePoint last = points[lastIndex];
+                last.tangent2 = last.position + (last.position - last.tangent);
+                points[lastIndex] = last;
+            }
             return points.ToArray();
         }
 
