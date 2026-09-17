@@ -109,6 +109,9 @@ namespace WaterConveyorSort.BoardSystem.Buoys
                 inputSystem.Unregister(inputCollider, this);
         }
 
+        public Vector3 GetBuoyPosition(int index) => (buoyRoot != null ? buoyRoot : transform)
+            .TransformPoint(firstBuoyOffset + Vector3.up * (index * Step));
+
         public void PlaceBuoy(Transform buoy, int index)
         {
             // Source order is bottom to top for the initial layout.

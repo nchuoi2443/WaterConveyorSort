@@ -63,6 +63,7 @@ namespace WaterConveyorSort.BoardSystem
             transfers = new BuoyTransferController(conveyorController);
             foreach (BuoyStackHolder holder in buoyStackHolderController.Holders)
                 holder.InitializeTransfers(transfers);
+            conveyorController.ConfigureReceivers(buoyStackHolderController.Holders);
         }
 
         private void OnDestroy()

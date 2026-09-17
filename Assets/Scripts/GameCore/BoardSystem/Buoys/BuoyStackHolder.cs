@@ -2,6 +2,7 @@ using System;
 using System.Collections.Generic;
 using UnityEngine;
 using WaterConveyorSort.LevelData;
+using WaterConveyorSort.BoardSystem.Conveyor;
 
 namespace WaterConveyorSort.BoardSystem.Buoys
 {
@@ -38,6 +39,18 @@ namespace WaterConveyorSort.BoardSystem.Buoys
 
         private BuoyTransferController transfer;
         private bool busy;
+        internal bool CanReceive(ConveyorBuoyGroup group) => !busy && transfer != null &&
+            ActiveStack != null && ActiveStack.Buoys.Count > 0 && group.IsLoaded &&
+            group.HasColor(ActiveStack.Buoys[ActiveStack.Buoys.Count - 1].ColorCode);
+
+        internal bool TryReceive(ConveyorBuoyGroup group)
+        {
+            if (!CanReceive(group)) return false;
+            busy = true;
+            ActiveStack.CanReceiveInput = false;
+            transfer.BeginReceive(ActiveStack, group, FinishTransfer);
+            return true;
+        }
         public void InitializeTransfers(BuoyTransferController controller)
         {
             transfer = controller;

@@ -1,0 +1,51 @@
+classDiagram
+direction LR
+LevelManager --> LevelDataSO : reads
+LevelManager --> BoardManager : initializes
+LevelManager --> ConveyorController : configures
+LevelManager --> InputSystem
+BoardManager *-- BuoyStackHolderController
+BoardManager *-- BuoyTransferController : ticks in LateUpdate
+BoardManager --> ConveyorController
+BuoyStackHolderController *-- BuoyStackHolder : creates
+BuoyStackHolderController ..> BuoyStackVisual : instantiates
+BuoyStackHolderController ..> BuoyVisual : instantiates
+BuoyStackHolder *-- BuoyStack : queue
+BuoyStackHolder --> BuoyStackHolderVisual
+BuoyStackHolder --> BuoyTransferController
+BuoyStack *-- Buoy : stack contents
+BuoyStack --> BuoyStackVisual
+Buoy --> BuoyVisual
+BuoyVisual --> BuoyColorConfig
+BuoyStackVisual ..|> IInputReceiver
+BuoyStackVisual --> InputSystem : registers collider
+InputSystem --> IInputReceiver : dispatches click
+ConveyorController *-- ConveyorBuilder
+ConveyorController *-- ConveyorBuoyGroup
+ConveyorController --> BuoyStackHolder : receiver ports
+ConveyorBuoyGroup o-- Buoy : current contents
+MonoBehaviour <|-- ConveyorBuoyGroup
+BuoyTransferController --> BuoyStack : removes or adds buoy
+BuoyTransferController --> ConveyorBuoyGroup : receives or takes buoy
+BuoyTransferController --> ConveyorController : reserves or removes group
+ConveyorBuilder ..> BoardCoordinates
+BuoyStackHolderController ..> BoardCoordinates
+ConveyorController ..> BoardCoordinates
+LevelDataSO *-- BoardData
+LevelDataSO *-- PathData
+LevelDataSO *-- BuoyNodeData
+LevelDataSO --> ColorDataSO
+BuoyNodeData *-- BuoyColumnData
+BuoyColumnData *-- BuoyData
+BuoyColumnData *-- ColumnElementData
+BuoyData *-- BuoyElementData
+ColorDataSO *-- ColorEntryData
+BuoyColorConfig *-- ColorMaterialEntry
+BuoyTransferController *-- Transfer
+BuoyTransferController *-- ReceiveTransfer
+Transfer *-- Flight
+ConveyorController *-- PathMoveSlot
+ConveyorController *-- GroupPosition
+ConveyorController *-- ReceiverPort
+ConveyorController *-- EnterRequest
+Outline *-- ListVector3

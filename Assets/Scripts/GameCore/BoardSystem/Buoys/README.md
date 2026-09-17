@@ -55,6 +55,14 @@ BoardManager clears its controller when destroyed. Reinitialization clears old r
 
 ## Stack to conveyor transfers
 
+## Conveyor to stack transfers
+
+The holder's configured OutletCell also serves as its receiving port; there is no separate inlet direction in the current level data. Conveyor movement detects crossing this port along the spline, including loop wrap, and stops an eligible group there. Only fully loaded groups whose buoys all match the active stack's top color can return. Empty, busy, and unconfigured holders do not receive groups. Other groups continue along the conveyor.
+
+The holder locks input while receiving. Buoys leave the group's top and fly to the next free stack position in sequence, using Transfer Speed and Launch Interval. The stopped group retains its conveyor reservation until the last buoy lands, then is removed and the holder unlocks. Reset clears any receiving flight before stacks and conveyor groups are destroyed.
+
+## Stack to conveyor transfer scheduling
+
 BoardManager owns BuoyTransferController and ticks it in LateUpdate, after conveyor movement. This frame-based scheduler launches overlapping flights without asynchronous tasks surviving a level reset. Configure Transfer Speed and Launch Interval on BoardManager. Flight speed is clamped to at least conveyor speed + 0.5 world units/second so a moving destination remains catchable.
 
 ConveyorController projects the holder's OutletCell (GridPosition + OutletDirection) onto its spline to find the entry. Configure Move Speed and Surface Offset on this component. Groups use spline Travel in world distance; closed paths wrap and open paths stop at their end. Group capacity is currently unlimited.
