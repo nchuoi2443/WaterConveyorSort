@@ -24,7 +24,8 @@ namespace WaterConveyorSort.BoardSystem.Buoys
         public BuoyTransferController(ConveyorController conveyor) { this.conveyor = conveyor; }
         internal void BeginReceive(BuoyStack stack, ConveyorBuoyGroup group, Action completed)
         {
-            BeginReceive(stack, group, stack.Buoys.Count, completed);
+            BeginReceive(stack, group, stack.Buoys.Count, completed, descentDuration: stack.Visual.ReceiveDescentDuration,
+                topClearance: stack.Visual.ReceiveTopClearance);
         }
         internal void BeginReceive(BuoyStack stack, ConveyorBuoyGroup group, int baseIndex,
             Action completed, float? duration = null, float? delay = null, Action<int> consumed = null, float descentDuration = 0f, float topClearance = 0f)
@@ -36,6 +37,7 @@ namespace WaterConveyorSort.BoardSystem.Buoys
                 Duration = Mathf.Max(0.01f, duration ?? receiveFlightDuration),
                 Delay = Mathf.Max(0f, delay ?? receiveLaunchDelay),
                 DescentDuration = Mathf.Max(0f, descentDuration), TopClearance = Mathf.Max(0f, topClearance) };
+            stack.Visual.BeginReceiveHeight(baseIndex + transfer.Count);
             receives.Add(transfer);
             LaunchReceiveFlights(transfer);
         }
@@ -139,6 +141,7 @@ namespace WaterConveyorSort.BoardSystem.Buoys
             {
                 ReceiveTransfer transfer = receives[i];
                 transfer.Elapsed += Mathf.Max(0f, deltaTime);
+                transfer.Stack.Visual.TickReceiveHeight(deltaTime);
                 LaunchReceiveFlights(transfer);
                 foreach (ReceiveFlight flight in transfer.Flights)
                 {
@@ -173,6 +176,7 @@ namespace WaterConveyorSort.BoardSystem.Buoys
                 if (transfer.Arrived != transfer.Count) continue;
                 receives.RemoveAt(i);
                 conveyor.RemoveGroup(transfer.Group);
+                transfer.Stack.Visual.EndReceiveHeight();
                 int consumed = transfer.Stack.ConsumeTopGroups();
                 if (consumed > 0)
                 {

@@ -49,6 +49,16 @@ namespace WaterConveyorSort.BoardSystem.Buoys
         public float FlightArcHeight => Mathf.Max(0f, flightArcHeight);
         private Transform spinningTransform;
         private Quaternion flightRotation;
+        private Quaternion headFacingOffset;
+        private void Awake()
+        {
+            if (head != null) headFacingOffset = Quaternion.Inverse(transform.rotation) * head.transform.rotation;
+        }
+        public void SetHeadDirection(Vector3 direction, Vector3 up)
+        {
+            if (head == null || direction.sqrMagnitude < 0.000001f) return;
+            head.transform.rotation = Quaternion.LookRotation(direction, up) * headFacingOffset;
+        }
         public void BeginFlight()
         {
             if (head != null) head.SetActive(false);

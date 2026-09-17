@@ -155,6 +155,7 @@ class LevelManager {
     -SplineComputer splineComputer
     -SplineMesh splineMesh
     -float moveSpeed
+    -float waterSpeed
     -float rootYOffset
     -float pathMoveSlotSpacing
     -float conveyorGroupGap
@@ -285,6 +286,8 @@ private SplineComputer splineComputer;
 private SplineMesh splineMesh;
 [SerializeField, Min(0f)]
 private float moveSpeed = 1f;
+[Tooltip("Water texture scroll speed. Zero stops scrolling; negative values reverse direction.")] [SerializeField]
+private float waterSpeed = 1f;
 [Tooltip("Group root height above the spline, along the board's local up axis, in world units.")] [SerializeField]
 private float rootYOffset = 0.2f;
 [SerializeField, Min(0.01f)]
@@ -381,6 +384,7 @@ class BuoyStackHolder {
     +IReadOnlyList~BuoyStack~ Stacks
     +BuoyStack ActiveStack
     +int VisibleCapacity
+    +int RemainingStackCount
     +Vector2Int GridPosition
     +Vector2Int OutletDirection
     +Vector2Int OutletCell
@@ -414,6 +418,12 @@ class BuoyStackHolderVisual {
     +SetOutletDirection(Vector2Int direction) void
     -Collider receiveCollider
     -float advanceDuration
+    -TMP_Text remainingStackText
+    -GameObject imgTick
+    -Transform statusRoot
+    -Camera statusCamera
+    +SetQueueStatus(int capacity, int remaining) void
+    -LateUpdate() void
     -BuoyStackHolder owner
     -Coroutine advanceTween
     +Initialize(BuoyStackHolder holder, int visibleCapacity) void
@@ -442,8 +452,24 @@ class BuoyStackVisual {
     -bool poleCached
     -bool inputEnabled
     -int count
+    -float receiveHeightTweenDuration
+    -float receiveDescentDuration
+    -float receiveTopClearance
+    +float ReceiveDescentDuration
+    +float ReceiveTopClearance
+    -int reservedCount
+    -float displayedHeight, tweenStartHeight, heightElapsed
+    -HeightForCount(int value) float
+    +BeginReceiveHeight(int expectedCount) void
+    +TickReceiveHeight(float deltaTime) void
+    +EndReceiveHeight() void
+    -bool fixedHeight
+    -float fixedStackHeight
+    +SetFixedHeight(float height) void
+    +GetTopPosition() Vector3
     +SetInputEnabled(bool enabled) void
     +RefreshHeight(int buoyCount) void
+    -ApplyHeight(float height) void
     -Collider[] inputColliders
     -InputSystem inputSystem
     -BuoyStack owner
@@ -469,6 +495,18 @@ class BuoyVisual {
     -int BaseColor$
     +Refresh(int colorId, Color color) void
     +MoveTowards(Vector3 target, float distance) bool
+    -Transform spinRoot
+    -GameObject head
+    -float flightArcHeight
+    +float FlightArcHeight
+    -Transform spinningTransform
+    -Quaternion flightRotation
+    -Quaternion headFacingOffset
+    -Awake() void
+    +SetHeadDirection(Vector3 direction, Vector3 up) void
+    +BeginFlight() void
+    +SetFlightProgress(float progress) void
+    +EndFlight() void
     -bool released
     +Release() void
 }
@@ -570,6 +608,7 @@ private bool cleared;
 public IReadOnlyList<BuoyStack> Stacks { get; }
 public BuoyStack ActiveStack => stacks.Count > 0 ? stacks[0] : null;
 public int VisibleCapacity { get; }
+public int RemainingStackCount => Mathf.Max(0, stacks.Count + pending.Count - 1);
 public Vector2Int GridPosition { get; }
 public Vector2Int OutletDirection { get; }
 public Vector2Int OutletCell => GridPosition + OutletDirection;
@@ -620,6 +659,16 @@ public void SetOutletDirection(Vector2Int direction)
 private Collider receiveCollider;
 [SerializeField, Min(0f)]
 private float advanceDuration = 0.3f;
+[Header("Queue Status")] [SerializeField]
+private TMP_Text remainingStackText;
+[SerializeField]
+private GameObject imgTick;
+[SerializeField]
+private Transform statusRoot;
+[SerializeField]
+private Camera statusCamera;
+public void SetQueueStatus(int capacity, int remaining)
+private void LateUpdate()
 private BuoyStackHolder owner;
 private Coroutine advanceTween;
 public void Initialize(BuoyStackHolder holder, int visibleCapacity)
@@ -658,8 +707,27 @@ private Bounds poleBounds;
 private bool poleCached;
 private bool inputEnabled;
 private int count;
+[Header("Incoming Group")] [SerializeField, Min(0f)]
+private float receiveHeightTweenDuration = 0.2f;
+[SerializeField, Min(0.01f)]
+private float receiveDescentDuration = 0.25f;
+[SerializeField, Min(0f)]
+private float receiveTopClearance = 0.2f;
+public float ReceiveDescentDuration => Mathf.Max(0.01f, receiveDescentDuration);
+public float ReceiveTopClearance => Mathf.Max(0f, receiveTopClearance);
+private int reservedCount = -1;
+private float displayedHeight, tweenStartHeight, heightElapsed;
+private float HeightForCount(int value)
+public void BeginReceiveHeight(int expectedCount)
+public void TickReceiveHeight(float deltaTime)
+public void EndReceiveHeight()
+private bool fixedHeight;
+private float fixedStackHeight;
+public void SetFixedHeight(float height)
+public Vector3 GetTopPosition()
 public void SetInputEnabled(bool enabled)
 public void RefreshHeight(int buoyCount)
+private void ApplyHeight(float height)
 [SerializeField]
 private Collider[] inputColliders;
 private InputSystem inputSystem;
@@ -691,6 +759,21 @@ private MaterialPropertyBlock propertyBlock;
 private static readonly int BaseColor = Shader.PropertyToID("_Color");
 public void Refresh(int colorId, Color color)
 public bool MoveTowards(Vector3 target, float distance)
+[Tooltip("Optional model child to spin independently of the movement root.")] [SerializeField]
+private Transform spinRoot;
+[Tooltip("Head visual hidden during flight and shown again on landing.")] [SerializeField]
+private GameObject head;
+[SerializeField, Min(0f)]
+private float flightArcHeight = 1f;
+public float FlightArcHeight => Mathf.Max(0f, flightArcHeight);
+private Transform spinningTransform;
+private Quaternion flightRotation;
+private Quaternion headFacingOffset;
+private void Awake()
+public void SetHeadDirection(Vector3 direction, Vector3 up)
+public void BeginFlight()
+public void SetFlightProgress(float progress)
+public void EndFlight()
 private bool released;
 public void Release()
 ```
@@ -726,6 +809,9 @@ class ConveyorBuoyGroup {
     +HasColor(int colorCode) bool
     ~TakeTop() Buoy
     -float spacing
+    -Vector3 travelDirection
+    -Vector3 travelUp
+    ~SetTravelDirection(Vector3 direction, Vector3 up) void
     +Initialize(double percent, float spacing) void
     +GetSlotPosition(int slot) Vector3
     +Receive(Buoy buoy, int slot) void
@@ -736,6 +822,9 @@ MonoBehaviour <|-- ConveyorBuoyGroup
 class ConveyorController {
     -SplineComputer splineComputer
     -SplineMesh splineMesh
+    -int WaterSpeedId$
+    -MaterialPropertyBlock waterProperties
+    +SetWaterSpeed(float speed) void
     -float moveSpeed
     -float rootYOffset
     -bool paused
@@ -850,6 +939,9 @@ private void Update()
 public bool HasColor(int colorCode)
 internal Buoy TakeTop()
 private float spacing;
+private Vector3 travelDirection;
+private Vector3 travelUp = Vector3.up;
+internal void SetTravelDirection(Vector3 direction, Vector3 up)
 public void Initialize(double percent, float spacing)
 public Vector3 GetSlotPosition(int slot)
 public void Receive(Buoy buoy, int slot)
@@ -864,6 +956,9 @@ Source: [Assets/Scripts/GameCore/BoardSystem/Conveyor/ConveyorController.cs](../
 ```csharp
 private SplineComputer splineComputer;
 private SplineMesh splineMesh;
+private static readonly int WaterSpeedId = Shader.PropertyToID("_WaterSpeed");
+private MaterialPropertyBlock waterProperties;
+public void SetWaterSpeed(float speed)
 private float moveSpeed = 1f;
 private float rootYOffset = 0.2f;
 private bool paused;
@@ -1013,6 +1108,11 @@ class StackQueueVisual {
     -float stackSpacing
     -float receiveFlightDuration
     -float receiveLaunchDelay
+    -float fixedStackHeight
+    -float receiveDescentDuration
+    -float receiveTopClearance
+    +float ReceiveDescentDuration
+    +float ReceiveTopClearance
     +float ReceiveFlightDuration
     +float ReceiveLaunchDelay
     +ValidateSetup() void
@@ -1107,6 +1207,14 @@ private float stackSpacing = 1.2f;
 private float receiveFlightDuration = 0.4f;
 [SerializeField, Min(0f)]
 private float receiveLaunchDelay = 0.12f;
+[SerializeField, Min(0.01f)]
+private float fixedStackHeight = 1f;
+[SerializeField, Min(0.01f)]
+private float receiveDescentDuration = 0.25f;
+[SerializeField, Min(0f)]
+private float receiveTopClearance = 0.2f;
+public float ReceiveDescentDuration => Mathf.Max(0.01f, receiveDescentDuration);
+public float ReceiveTopClearance => Mathf.Max(0f, receiveTopClearance);
 public float ReceiveFlightDuration => Mathf.Max(0.01f, receiveFlightDuration);
 public float ReceiveLaunchDelay => Mathf.Max(0f, receiveLaunchDelay);
 public void ValidateSetup()
@@ -1132,13 +1240,14 @@ class BuoyTransferController {
     +SetReceiveSettings(float duration, float delay) void
     +BuoyTransferController(ConveyorController conveyor)
     ~BeginReceive(BuoyStack stack, ConveyorBuoyGroup group, Action completed) void
-    ~BeginReceive(BuoyStack stack, ConveyorBuoyGroup group, int baseIndex, Action completed, float? duration = null, float? delay = null, Action~int~ consumed = null) void
+    ~BeginReceive(BuoyStack stack, ConveyorBuoyGroup group, int baseIndex, Action completed, float? duration = null, float? delay = null, Action~int~ consumed = null, float descentDuration = 0f, float topClearance = 0f) void
     +Begin(BuoyStack stack, Vector2Int outlet, BuoyStackHolder sourceHolder, Action completed) void
     ~BeginFromQueue(BuoyStack stack, Action completed, Action~ConveyorBuoyGroup~ departing) void
     -BeginExport(BuoyStack stack, BuoyStackHolder sourceHolder, Action completed, Action~float, Func~Vector3_float~, Action~ConveyorBuoyGroup~~ requestEntry, Action~ConveyorBuoyGroup~ departing = null) void
     +Tick(float deltaTime, float speed, float interval) void
     -LaunchReceiveFlights(ReceiveTransfer transfer) void$
     -TickReceives(float deltaTime) void
+    -EvaluateArc(Vector3 start, Vector3 target, Vector3 up, float progress, float height) Vector3$
     +Clear() void
 }
 class Transfer {
@@ -1157,16 +1266,18 @@ class ReceiveTransfer {
     +Action Completed
     +List~ReceiveFlight~ Flights
     +int BaseIndex, Count, Next, Arrived
-    +float Elapsed, Duration, Delay
+    +float Elapsed, Duration, Delay, DescentDuration, TopClearance
 }
 class ReceiveFlight {
     +Buoy Buoy
     +int Slot
-    +Vector3 StartPosition
+    +Vector3 StartPosition, ApexPosition
     +float LaunchTime
     +bool Arrived
 }
 class Flight {
+    +Vector3 StartPosition, Up
+    +float Elapsed, Duration
     +Buoy Buoy
     +int Slot
     +bool Arrived
@@ -1194,13 +1305,14 @@ public void SetPaused(bool paused)
 public void SetReceiveSettings(float duration, float delay)
 public BuoyTransferController(ConveyorController conveyor)
 internal void BeginReceive(BuoyStack stack, ConveyorBuoyGroup group, Action completed)
-internal void BeginReceive(BuoyStack stack, ConveyorBuoyGroup group, int baseIndex, Action completed, float? duration = null, float? delay = null, Action<int> consumed = null)
+internal void BeginReceive(BuoyStack stack, ConveyorBuoyGroup group, int baseIndex, Action completed, float? duration = null, float? delay = null, Action<int> consumed = null, float descentDuration = 0f, float topClearance = 0f)
 public void Begin(BuoyStack stack, Vector2Int outlet, BuoyStackHolder sourceHolder, Action completed)
 internal void BeginFromQueue(BuoyStack stack, Action completed, Action<ConveyorBuoyGroup> departing)
 private void BeginExport(BuoyStack stack, BuoyStackHolder sourceHolder, Action completed, Action<float, Func<Vector3, float>, Action<ConveyorBuoyGroup>> requestEntry, Action<ConveyorBuoyGroup> departing = null)
 public void Tick(float deltaTime, float speed, float interval)
 private static void LaunchReceiveFlights(ReceiveTransfer transfer)
 private void TickReceives(float deltaTime)
+private static Vector3 EvaluateArc(Vector3 start, Vector3 target, Vector3 up, float progress, float height)
 public void Clear()
 ```
 
@@ -1229,7 +1341,7 @@ public ConveyorBuoyGroup Group;
 public Action Completed;
 public readonly List<ReceiveFlight> Flights = new List<ReceiveFlight>();
 public int BaseIndex, Count, Next, Arrived;
-public float Elapsed, Duration, Delay;
+public float Elapsed, Duration, Delay, DescentDuration, TopClearance;
 ```
 
 ### ReceiveFlight
@@ -1239,7 +1351,7 @@ Source: [Assets/Scripts/GameCore/BoardSystem/Buoys/BuoyTransferController.cs](..
 ```csharp
 public Buoy Buoy;
 public int Slot;
-public Vector3 StartPosition;
+public Vector3 StartPosition, ApexPosition;
 public float LaunchTime;
 public bool Arrived;
 ```
@@ -1249,6 +1361,8 @@ public bool Arrived;
 Source: [Assets/Scripts/GameCore/BoardSystem/Buoys/BuoyTransferController.cs](../Assets/Scripts/GameCore/BoardSystem/Buoys/BuoyTransferController.cs).
 
 ```csharp
+public Vector3 StartPosition, Up;
+public float Elapsed, Duration;
 public Buoy Buoy;
 public int Slot;
 public bool Arrived;
@@ -1593,8 +1707,11 @@ class Outline {
     -Material outlineMaskMaterial
     -Material outlineFillMaterial
     -bool needsUpdate
-    -int _stencilCounter$
-    -int _stencilID
+    -Dictionary~(Mode_Color_float)_SharedOutlineMaterials~ materialCache = new Dictionary~(Mode_Color_float)_SharedOutlineMaterials~()$
+    -(Mode, Color, float) materialKey
+    -SharedOutlineMaterials sharedOutline
+    -bool materialsAttached
+    -ReleaseSharedMaterials() void
     -Awake() void
     -OnEnable() void
     -OnValidate() void
@@ -1647,8 +1764,11 @@ private Renderer[] renderers;
 private Material outlineMaskMaterial;
 private Material outlineFillMaterial;
 private bool needsUpdate;
-private static int _stencilCounter = 1;
-private int _stencilID;
+private static readonly Dictionary<(Mode, Color, float), SharedOutlineMaterials> materialCache = new Dictionary<(Mode, Color, float), SharedOutlineMaterials>();
+private (Mode, Color, float) materialKey;
+private SharedOutlineMaterials sharedOutline;
+private bool materialsAttached;
+private void ReleaseSharedMaterials()
 void Awake()
 void OnEnable()
 void OnValidate()
@@ -1685,6 +1805,7 @@ public List<Vector3> data;
 ## Current behavior
 
 - ConveyorBuilder merges collinear grid cells and rounds turns with Bezier arcs using LevelManager.CornerRadius; straight sections and open endpoints are preserved. Mesh and groups share the rounded spline with Uniform distance sampling to avoid stretching extruded mesh copies on long straight segments.
+- Holder stacks reserve the entire incoming group height and tween once at detection; buoys approach the reserved pole top then descend without further rotation. Queue stacks have a fixed pole height. Buoy flights follow upward parabolic arcs and flip 180 degrees around local X; queue receives approach above the pole or target slot and then descend without further rotation. Multi-stack holder prefab status shows the remaining stacks excluding active, or a tick at zero, and faces the camera.
 - Holder VisibleCapacity and decorations are fixed at initialization. The entire holder is disabled when no visible stack or pending column remains, after the final export completes. Only visible stacks are spawned; pending columns remain data.
 - The empty front stack is disabled after its outgoing transfer completes. The rear stack tweens forward while the replacement appears in the rear slot. Only the front accepts input and groups.
 - The holder root trigger detects a group using Enter/Stay. Group detection uses a trigger sphere and kinematic Rigidbody.

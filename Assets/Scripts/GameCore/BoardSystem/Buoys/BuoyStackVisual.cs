@@ -19,6 +19,35 @@ namespace WaterConveyorSort.BoardSystem.Buoys
         private bool poleCached;
         private bool inputEnabled;
         private int count;
+        [Header("Incoming Group")]
+        [SerializeField, Min(0f)] private float receiveHeightTweenDuration = 0.2f;
+        [SerializeField, Min(0.01f)] private float receiveDescentDuration = 0.25f;
+        [SerializeField, Min(0f)] private float receiveTopClearance = 0.2f;
+        public float ReceiveDescentDuration => Mathf.Max(0.01f, receiveDescentDuration);
+        public float ReceiveTopClearance => Mathf.Max(0f, receiveTopClearance);
+        private int reservedCount = -1;
+        private float displayedHeight, tweenStartHeight, heightElapsed;
+        private float HeightForCount(int value) => value > 0 ? buoyHeight * value + buoySpacing * (value - 1) : Mathf.Max(0f, emptyStackHeight);
+        public void BeginReceiveHeight(int expectedCount)
+        {
+            if (fixedHeight) return;
+            reservedCount = expectedCount;
+            tweenStartHeight = displayedHeight;
+            heightElapsed = 0f;
+            if (receiveHeightTweenDuration <= 0f) ApplyHeight(HeightForCount(reservedCount));
+        }
+        public void TickReceiveHeight(float deltaTime)
+        {
+            if (reservedCount < 0 || fixedHeight) return;
+            heightElapsed += Mathf.Max(0f, deltaTime);
+            float progress = receiveHeightTweenDuration > 0f ? Mathf.Clamp01(heightElapsed / receiveHeightTweenDuration) : 1f;
+            ApplyHeight(Mathf.Lerp(tweenStartHeight, HeightForCount(reservedCount), Mathf.SmoothStep(0f, 1f, progress)));
+        }
+        public void EndReceiveHeight()
+        {
+            reservedCount = -1;
+            RefreshHeight(count);
+        }
         private bool fixedHeight;
         private float fixedStackHeight;
         public void SetFixedHeight(float height)
@@ -30,8 +59,13 @@ namespace WaterConveyorSort.BoardSystem.Buoys
         public Vector3 GetTopPosition()
         {
             if (poleCached)
-                return poleTransform.TransformPoint(new Vector3(poleBounds.center.x, poleBounds.max.y, poleBounds.center.z));
-            return transform.TransformPoint(firstBuoyOffset + Vector3.up * (fixedStackHeight - buoyHeight * 0.5f));
+            {
+                Vector3 top = poleTransform.TransformPoint(new Vector3(poleBounds.center.x, poleBounds.max.y, poleBounds.center.z));
+                if (reservedCount >= 0)
+                    top += transform.TransformVector(Vector3.up) * Mathf.Max(0f, HeightForCount(reservedCount) - displayedHeight);
+                return top;
+            }
+            return transform.TransformPoint(firstBuoyOffset + Vector3.up * ((fixedHeight ? fixedStackHeight : HeightForCount(reservedCount >= 0 ? reservedCount : count)) - buoyHeight * 0.5f));
         }
 
         public void SetInputEnabled(bool enabled)
@@ -45,8 +79,12 @@ namespace WaterConveyorSort.BoardSystem.Buoys
         public void RefreshHeight(int buoyCount)
         {
             count = buoyCount;
-            float height = count > 0 ? buoyHeight * count + buoySpacing * (count - 1) : Mathf.Max(0f, emptyStackHeight);
-            if (fixedHeight) height = fixedStackHeight;
+            if (reservedCount >= 0 && !fixedHeight) { SetInputEnabled(inputEnabled); return; }
+            ApplyHeight(fixedHeight ? fixedStackHeight : HeightForCount(count));
+        }
+        private void ApplyHeight(float height)
+        {
+            displayedHeight = height;
             if (poleTransform != null)
             {
                 if (!poleCached)

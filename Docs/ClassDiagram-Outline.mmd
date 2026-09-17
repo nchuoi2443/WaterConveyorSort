@@ -15,8 +15,11 @@ class Outline {
     -Material outlineMaskMaterial
     -Material outlineFillMaterial
     -bool needsUpdate
-    -int _stencilCounter$
-    -int _stencilID
+    -Dictionary~(Mode_Color_float)_SharedOutlineMaterials~ materialCache = new Dictionary~(Mode_Color_float)_SharedOutlineMaterials~()$
+    -(Mode, Color, float) materialKey
+    -SharedOutlineMaterials sharedOutline
+    -bool materialsAttached
+    -ReleaseSharedMaterials() void
     -Awake() void
     -OnEnable() void
     -OnValidate() void

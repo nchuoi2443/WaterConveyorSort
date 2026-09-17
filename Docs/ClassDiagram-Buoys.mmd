@@ -59,6 +59,7 @@ class BuoyStackHolder {
     +IReadOnlyList~BuoyStack~ Stacks
     +BuoyStack ActiveStack
     +int VisibleCapacity
+    +int RemainingStackCount
     +Vector2Int GridPosition
     +Vector2Int OutletDirection
     +Vector2Int OutletCell
@@ -92,6 +93,12 @@ class BuoyStackHolderVisual {
     +SetOutletDirection(Vector2Int direction) void
     -Collider receiveCollider
     -float advanceDuration
+    -TMP_Text remainingStackText
+    -GameObject imgTick
+    -Transform statusRoot
+    -Camera statusCamera
+    +SetQueueStatus(int capacity, int remaining) void
+    -LateUpdate() void
     -BuoyStackHolder owner
     -Coroutine advanceTween
     +Initialize(BuoyStackHolder holder, int visibleCapacity) void
@@ -120,8 +127,24 @@ class BuoyStackVisual {
     -bool poleCached
     -bool inputEnabled
     -int count
+    -float receiveHeightTweenDuration
+    -float receiveDescentDuration
+    -float receiveTopClearance
+    +float ReceiveDescentDuration
+    +float ReceiveTopClearance
+    -int reservedCount
+    -float displayedHeight, tweenStartHeight, heightElapsed
+    -HeightForCount(int value) float
+    +BeginReceiveHeight(int expectedCount) void
+    +TickReceiveHeight(float deltaTime) void
+    +EndReceiveHeight() void
+    -bool fixedHeight
+    -float fixedStackHeight
+    +SetFixedHeight(float height) void
+    +GetTopPosition() Vector3
     +SetInputEnabled(bool enabled) void
     +RefreshHeight(int buoyCount) void
+    -ApplyHeight(float height) void
     -Collider[] inputColliders
     -InputSystem inputSystem
     -BuoyStack owner
@@ -147,6 +170,18 @@ class BuoyVisual {
     -int BaseColor$
     +Refresh(int colorId, Color color) void
     +MoveTowards(Vector3 target, float distance) bool
+    -Transform spinRoot
+    -GameObject head
+    -float flightArcHeight
+    +float FlightArcHeight
+    -Transform spinningTransform
+    -Quaternion flightRotation
+    -Quaternion headFacingOffset
+    -Awake() void
+    +SetHeadDirection(Vector3 direction, Vector3 up) void
+    +BeginFlight() void
+    +SetFlightProgress(float progress) void
+    +EndFlight() void
     -bool released
     +Release() void
 }

@@ -36,6 +36,14 @@ namespace WaterConveyorSort.BoardSystem.Conveyor
             return buoy;
         }
         private float spacing;
+        private Vector3 travelDirection;
+        private Vector3 travelUp = Vector3.up;
+        internal void SetTravelDirection(Vector3 direction, Vector3 up)
+        {
+            travelDirection = direction;
+            travelUp = up;
+            foreach (Buoy buoy in buoys) buoy.Visual.SetHeadDirection(direction, up);
+        }
         public void Initialize(double percent, float spacing)
         {
             Percent = percent;
@@ -54,6 +62,7 @@ namespace WaterConveyorSort.BoardSystem.Conveyor
             buoy.Visual.transform.SetParent(transform, true);
             buoy.Visual.transform.localPosition = Vector3.up * (slot * spacing);
             buoys.Add(buoy);
+            buoy.Visual.SetHeadDirection(travelDirection, travelUp);
             if (slot == 0) Moving = true;
         }
         public void Clear()

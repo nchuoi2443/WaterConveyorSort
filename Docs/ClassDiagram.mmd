@@ -96,6 +96,7 @@ class BuoyStackHolder {
     +IReadOnlyList~BuoyStack~ Stacks
     +BuoyStack ActiveStack
     +int VisibleCapacity
+    +int RemainingStackCount
     +Vector2Int GridPosition
     +Vector2Int OutletDirection
     +Vector2Int OutletCell
@@ -129,6 +130,12 @@ class BuoyStackHolderVisual {
     +SetOutletDirection(Vector2Int direction) void
     -Collider receiveCollider
     -float advanceDuration
+    -TMP_Text remainingStackText
+    -GameObject imgTick
+    -Transform statusRoot
+    -Camera statusCamera
+    +SetQueueStatus(int capacity, int remaining) void
+    -LateUpdate() void
     -BuoyStackHolder owner
     -Coroutine advanceTween
     +Initialize(BuoyStackHolder holder, int visibleCapacity) void
@@ -157,8 +164,24 @@ class BuoyStackVisual {
     -bool poleCached
     -bool inputEnabled
     -int count
+    -float receiveHeightTweenDuration
+    -float receiveDescentDuration
+    -float receiveTopClearance
+    +float ReceiveDescentDuration
+    +float ReceiveTopClearance
+    -int reservedCount
+    -float displayedHeight, tweenStartHeight, heightElapsed
+    -HeightForCount(int value) float
+    +BeginReceiveHeight(int expectedCount) void
+    +TickReceiveHeight(float deltaTime) void
+    +EndReceiveHeight() void
+    -bool fixedHeight
+    -float fixedStackHeight
+    +SetFixedHeight(float height) void
+    +GetTopPosition() Vector3
     +SetInputEnabled(bool enabled) void
     +RefreshHeight(int buoyCount) void
+    -ApplyHeight(float height) void
     -Collider[] inputColliders
     -InputSystem inputSystem
     -BuoyStack owner
@@ -190,13 +213,14 @@ class BuoyTransferController {
     +SetReceiveSettings(float duration, float delay) void
     +BuoyTransferController(ConveyorController conveyor)
     ~BeginReceive(BuoyStack stack, ConveyorBuoyGroup group, Action completed) void
-    ~BeginReceive(BuoyStack stack, ConveyorBuoyGroup group, int baseIndex, Action completed, float? duration = null, float? delay = null, Action~int~ consumed = null) void
+    ~BeginReceive(BuoyStack stack, ConveyorBuoyGroup group, int baseIndex, Action completed, float? duration = null, float? delay = null, Action~int~ consumed = null, float descentDuration = 0f, float topClearance = 0f) void
     +Begin(BuoyStack stack, Vector2Int outlet, BuoyStackHolder sourceHolder, Action completed) void
     ~BeginFromQueue(BuoyStack stack, Action completed, Action~ConveyorBuoyGroup~ departing) void
     -BeginExport(BuoyStack stack, BuoyStackHolder sourceHolder, Action completed, Action~float, Func~Vector3_float~, Action~ConveyorBuoyGroup~~ requestEntry, Action~ConveyorBuoyGroup~ departing = null) void
     +Tick(float deltaTime, float speed, float interval) void
     -LaunchReceiveFlights(ReceiveTransfer transfer) void$
     -TickReceives(float deltaTime) void
+    -EvaluateArc(Vector3 start, Vector3 target, Vector3 up, float progress, float height) Vector3$
     +Clear() void
 }
 class Transfer {
@@ -215,16 +239,18 @@ class ReceiveTransfer {
     +Action Completed
     +List~ReceiveFlight~ Flights
     +int BaseIndex, Count, Next, Arrived
-    +float Elapsed, Duration, Delay
+    +float Elapsed, Duration, Delay, DescentDuration, TopClearance
 }
 class ReceiveFlight {
     +Buoy Buoy
     +int Slot
-    +Vector3 StartPosition
+    +Vector3 StartPosition, ApexPosition
     +float LaunchTime
     +bool Arrived
 }
 class Flight {
+    +Vector3 StartPosition, Up
+    +float Elapsed, Duration
     +Buoy Buoy
     +int Slot
     +bool Arrived
@@ -236,6 +262,18 @@ class BuoyVisual {
     -int BaseColor$
     +Refresh(int colorId, Color color) void
     +MoveTowards(Vector3 target, float distance) bool
+    -Transform spinRoot
+    -GameObject head
+    -float flightArcHeight
+    +float FlightArcHeight
+    -Transform spinningTransform
+    -Quaternion flightRotation
+    -Quaternion headFacingOffset
+    -Awake() void
+    +SetHeadDirection(Vector3 direction, Vector3 up) void
+    +BeginFlight() void
+    +SetFlightProgress(float progress) void
+    +EndFlight() void
     -bool released
     +Release() void
 }
@@ -266,6 +304,9 @@ class ConveyorBuoyGroup {
     +HasColor(int colorCode) bool
     ~TakeTop() Buoy
     -float spacing
+    -Vector3 travelDirection
+    -Vector3 travelUp
+    ~SetTravelDirection(Vector3 direction, Vector3 up) void
     +Initialize(double percent, float spacing) void
     +GetSlotPosition(int slot) Vector3
     +Receive(Buoy buoy, int slot) void
@@ -276,6 +317,9 @@ MonoBehaviour <|-- ConveyorBuoyGroup
 class ConveyorController {
     -SplineComputer splineComputer
     -SplineMesh splineMesh
+    -int WaterSpeedId$
+    -MaterialPropertyBlock waterProperties
+    +SetWaterSpeed(float speed) void
     -float moveSpeed
     -float rootYOffset
     -bool paused
@@ -399,6 +443,11 @@ class StackQueueVisual {
     -float stackSpacing
     -float receiveFlightDuration
     -float receiveLaunchDelay
+    -float fixedStackHeight
+    -float receiveDescentDuration
+    -float receiveTopClearance
+    +float ReceiveDescentDuration
+    +float ReceiveTopClearance
     +float ReceiveFlightDuration
     +float ReceiveLaunchDelay
     +ValidateSetup() void
@@ -437,6 +486,7 @@ class LevelManager {
     -SplineComputer splineComputer
     -SplineMesh splineMesh
     -float moveSpeed
+    -float waterSpeed
     -float rootYOffset
     -float pathMoveSlotSpacing
     -float conveyorGroupGap
@@ -578,8 +628,11 @@ class Outline {
     -Material outlineMaskMaterial
     -Material outlineFillMaterial
     -bool needsUpdate
-    -int _stencilCounter$
-    -int _stencilID
+    -Dictionary~(Mode_Color_float)_SharedOutlineMaterials~ materialCache = new Dictionary~(Mode_Color_float)_SharedOutlineMaterials~()$
+    -(Mode, Color, float) materialKey
+    -SharedOutlineMaterials sharedOutline
+    -bool materialsAttached
+    -ReleaseSharedMaterials() void
     -Awake() void
     -OnEnable() void
     -OnValidate() void
@@ -603,6 +656,10 @@ class Mode {
 }
 class ListVector3 {
     +List~Vector3~ data
+}
+class SharedOutlineMaterials {
+    +Material Mask, Fill
+    +int Users
 }
 LevelManager --> LevelDataSO : reads
 LevelManager --> BoardManager : initializes

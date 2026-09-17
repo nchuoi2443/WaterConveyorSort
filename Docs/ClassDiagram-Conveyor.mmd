@@ -26,6 +26,9 @@ class ConveyorBuoyGroup {
     +HasColor(int colorCode) bool
     ~TakeTop() Buoy
     -float spacing
+    -Vector3 travelDirection
+    -Vector3 travelUp
+    ~SetTravelDirection(Vector3 direction, Vector3 up) void
     +Initialize(double percent, float spacing) void
     +GetSlotPosition(int slot) Vector3
     +Receive(Buoy buoy, int slot) void
@@ -36,6 +39,9 @@ MonoBehaviour <|-- ConveyorBuoyGroup
 class ConveyorController {
     -SplineComputer splineComputer
     -SplineMesh splineMesh
+    -int WaterSpeedId$
+    -MaterialPropertyBlock waterProperties
+    +SetWaterSpeed(float speed) void
     -float moveSpeed
     -float rootYOffset
     -bool paused

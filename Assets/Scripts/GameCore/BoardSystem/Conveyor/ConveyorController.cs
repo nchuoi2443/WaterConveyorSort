@@ -197,7 +197,10 @@ namespace WaterConveyorSort.BoardSystem.Conveyor
         private void PlaceGroup(GroupPosition position)
         {
             position.Group.Percent = PercentAt(position.Distance);
-            position.Group.transform.position = splineComputer.Evaluate(position.Group.Percent).position + root.up * rootYOffset;
+            SplineSample sample = splineComputer.Evaluate(position.Group.Percent);
+            position.Group.transform.position = sample.position + root.up * rootYOffset;
+            // Movement travels backward along the spline.
+            position.Group.SetTravelDirection(-sample.forward, root.up);
         }
 
         private void Update()

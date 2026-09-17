@@ -50,7 +50,7 @@ Shader "Giby Games/Giby Ramp" {
 	}
 	//DummyShaderTextExporter
 	SubShader{
-		Tags { "RenderType"="Opaque" }
+		Tags { "RenderType"="Opaque" "RenderPipeline"="UniversalPipeline" }
 		LOD 200
 
 		Pass
@@ -58,13 +58,19 @@ Shader "Giby Games/Giby Ramp" {
 			HLSLPROGRAM
 			#pragma vertex vert
 			#pragma fragment frag
-			float4x4 unity_ObjectToWorld;
-			float4x4 unity_MatrixVP;
+
+			#pragma multi_compile_instancing
+			#include "Packages/com.unity.render-pipelines.universal/ShaderLibrary/Core.hlsl"
+
+			UNITY_INSTANCING_BUFFER_START(BuoyProperties)
+				UNITY_DEFINE_INSTANCED_PROP(float4, _Color)
+			UNITY_INSTANCING_BUFFER_END(BuoyProperties)
 			float4 _MainTex_ST;
 
 			struct Vertex_Stage_Input
 			{
 				float4 pos : POSITION;
+				UNITY_VERTEX_INPUT_INSTANCE_ID
 				float2 uv : TEXCOORD0;
 			};
 
@@ -72,28 +78,28 @@ Shader "Giby Games/Giby Ramp" {
 			{
 				float2 uv : TEXCOORD0;
 				float4 pos : SV_POSITION;
+				UNITY_VERTEX_INPUT_INSTANCE_ID
 			};
 
 			Vertex_Stage_Output vert(Vertex_Stage_Input input)
 			{
+				UNITY_SETUP_INSTANCE_ID(input);
 				Vertex_Stage_Output output;
+				UNITY_TRANSFER_INSTANCE_ID(input, output);
 				output.uv = (input.uv.xy * _MainTex_ST.xy) + _MainTex_ST.zw;
-				output.pos = mul(unity_MatrixVP, mul(unity_ObjectToWorld, input.pos));
+				output.pos = TransformObjectToHClip(input.pos.xyz);
 				return output;
 			}
 
 			Texture2D<float4> _MainTex;
 			SamplerState sampler_MainTex;
-			float4 _Color;
 
-			struct Fragment_Stage_Input
-			{
-				float2 uv : TEXCOORD0;
-			};
 
-			float4 frag(Fragment_Stage_Input input) : SV_TARGET
+			float4 frag(Vertex_Stage_Output input) : SV_TARGET
 			{
-				return _MainTex.Sample(sampler_MainTex, input.uv.xy) * _Color;
+				UNITY_SETUP_INSTANCE_ID(input);
+				float4 color = UNITY_ACCESS_INSTANCED_PROP(BuoyProperties, _Color);
+				return _MainTex.Sample(sampler_MainTex, input.uv.xy) * color;
 			}
 
 			ENDHLSL

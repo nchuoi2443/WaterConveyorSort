@@ -89,8 +89,28 @@ public class Outline : MonoBehaviour
 
     private bool needsUpdate;
 
-    private static int _stencilCounter = 1;
-    private int _stencilID;
+    private sealed class SharedOutlineMaterials
+    {
+        public Material Mask, Fill;
+        public int Users;
+    }
+    private static readonly Dictionary<(Mode, Color, float), SharedOutlineMaterials> materialCache =
+        new Dictionary<(Mode, Color, float), SharedOutlineMaterials>();
+    private (Mode, Color, float) materialKey;
+    private SharedOutlineMaterials sharedOutline;
+    private bool materialsAttached;
+
+    private void ReleaseSharedMaterials()
+    {
+        if (sharedOutline == null) return;
+        if (--sharedOutline.Users == 0)
+        {
+            materialCache.Remove(materialKey);
+            Destroy(sharedOutline.Mask);
+            Destroy(sharedOutline.Fill);
+        }
+        sharedOutline = null;
+    }
 
     void Awake()
     {
@@ -98,25 +118,19 @@ public class Outline : MonoBehaviour
         // Cache renderers
         renderers = GetComponentsInChildren<Renderer>();
 
-        // Instantiate outline materials
-        outlineMaskMaterial = Instantiate(Resources.Load<Material>(@"Materials/OutlineMask"));
-        outlineFillMaterial = Instantiate(Resources.Load<Material>(@"Materials/OutlineFill"));
-
-        outlineMaskMaterial.name = "OutlineMask (Instance)";
-        outlineFillMaterial.name = "OutlineFill (Instance)";
-
         // Retrieve or generate smooth normals
         LoadSmoothNormals();
 
         // Apply material properties immediately
         needsUpdate = true;
 
-        _stencilID = _stencilCounter++;
-        if (_stencilCounter > 255) _stencilCounter = 1; // stencil limit
+        UpdateMaterialProperties();
+
     }
 
     void OnEnable()
     {
+        materialsAttached = true;
         foreach (var renderer in renderers)
         {
 
@@ -126,7 +140,7 @@ public class Outline : MonoBehaviour
             materials.Add(outlineMaskMaterial);
             materials.Add(outlineFillMaterial);
 
-            renderer.materials = materials.ToArray();
+            renderer.sharedMaterials = materials.ToArray();
         }
     }
 
@@ -162,6 +176,7 @@ public class Outline : MonoBehaviour
 
     void OnDisable()
     {
+        materialsAttached = false;
         foreach (var renderer in renderers)
         {
 
@@ -171,16 +186,14 @@ public class Outline : MonoBehaviour
             materials.Remove(outlineMaskMaterial);
             materials.Remove(outlineFillMaterial);
 
-            renderer.materials = materials.ToArray();
+            renderer.sharedMaterials = materials.ToArray();
         }
     }
 
     void OnDestroy()
     {
 
-        // Destroy material instances
-        Destroy(outlineMaskMaterial);
-        Destroy(outlineFillMaterial);
+        ReleaseSharedMaterials();
     }
 
     void Bake()
@@ -314,8 +327,37 @@ public class Outline : MonoBehaviour
 
     public void UpdateMaterialProperties()
     {
-        outlineMaskMaterial.SetFloat("_StencilID", _stencilID);
-        outlineFillMaterial.SetFloat("_StencilID", _stencilID);
+        var key = (outlineMode, outlineColor, outlineWidth);
+        if (sharedOutline != null && materialKey.Equals(key)) return;
+        Material previousMask = outlineMaskMaterial, previousFill = outlineFillMaterial;
+        if (!materialCache.TryGetValue(key, out SharedOutlineMaterials next))
+        {
+            next = new SharedOutlineMaterials
+            {
+                Mask = Instantiate(Resources.Load<Material>(@"Materials/OutlineMask")),
+                Fill = Instantiate(Resources.Load<Material>(@"Materials/OutlineFill"))
+            };
+            next.Mask.enableInstancing = true;
+            next.Fill.enableInstancing = true;
+            materialCache.Add(key, next);
+        }
+        next.Users++;
+        if (materialsAttached)
+            foreach (Renderer renderer in renderers)
+            {
+                Material[] materials = renderer.sharedMaterials;
+                for (int i = 0; i < materials.Length; i++)
+                {
+                    if (materials[i] == previousMask) materials[i] = next.Mask;
+                    else if (materials[i] == previousFill) materials[i] = next.Fill;
+                }
+                renderer.sharedMaterials = materials;
+            }
+        ReleaseSharedMaterials();
+        materialKey = key;
+        sharedOutline = next;
+        outlineMaskMaterial = next.Mask;
+        outlineFillMaterial = next.Fill;
         // Apply properties according to mode
         outlineFillMaterial.SetColor("_OutlineColor", outlineColor);
 
