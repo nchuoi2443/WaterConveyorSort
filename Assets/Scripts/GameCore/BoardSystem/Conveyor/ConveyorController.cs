@@ -42,6 +42,8 @@ namespace WaterConveyorSort.BoardSystem.Conveyor
         private Transform root;
         private bool closed;
         private float length;
+        private float cornerRadius = 0.7f;
+        public void ConfigureCorners(float radius) => cornerRadius = Mathf.Max(0f, radius);
         private ConveyorBuilder conveyorBuilder;
 
         private readonly List<PathMoveSlot> _pathMoveSlots = new List<PathMoveSlot>();
@@ -261,7 +263,7 @@ namespace WaterConveyorSort.BoardSystem.Conveyor
             root = boardRoot;
             closed = pathData.IsClosed;
             conveyorBuilder = new ConveyorBuilder(splineComputer, splineMesh);
-            conveyorBuilder.BuildConveyor(boardData, pathData, boardRoot);
+            conveyorBuilder.BuildConveyor(boardData, pathData, boardRoot, cornerRadius);
             length = splineComputer.CalculateLength();
             _pathMoveSlots.Clear();
             int segments = Mathf.Max(1, Mathf.CeilToInt(length / slotSpacing));

@@ -30,6 +30,8 @@ namespace WaterConveyorSort.LevelSystem
         [SerializeField] private float rootYOffset = 0.2f;
         [SerializeField, Min(0.01f)] private float pathMoveSlotSpacing = 0.3f;
         [SerializeField, Min(0.01f)] private float conveyorGroupGap = 0.6f;
+        [Tooltip("Corner radius in board-local units. Applied when initializing the level; zero keeps sharp corners.")]
+        [SerializeField, Min(0f)] private float cornerRadius = 0.7f;
         [Header("Transfer Setup")]
         [SerializeField, Min(0.01f)] private float transferSpeed = 4f;
         [SerializeField, Min(0f)] private float launchInterval = 0.12f;
@@ -86,6 +88,7 @@ namespace WaterConveyorSort.LevelSystem
             if (conveyorController == null || splineComputer == null || splineMesh == null || boardRoot == null || inputSystem == null)
                 throw new InvalidOperationException("Assign board root, input system, conveyor and spline references on LevelManager.");
             conveyorController.Configure(splineComputer, splineMesh);
+            conveyorController.ConfigureCorners(cornerRadius);
             conveyorController.ConfigurePathSlots(pathMoveSlotSpacing, conveyorGroupGap);
             boardManager.Configure(boardRoot, conveyorController, inputSystem, buoyPrefab, buoyStackPrefab, buoyStackHolderPrefab);
             boardManager.ConfigureStackQueue(stackQueueVisual, stackQueueExit);

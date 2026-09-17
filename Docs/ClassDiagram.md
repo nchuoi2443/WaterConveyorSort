@@ -158,6 +158,7 @@ class LevelManager {
     -float rootYOffset
     -float pathMoveSlotSpacing
     -float conveyorGroupGap
+    -float cornerRadius
     -float transferSpeed
     -float launchInterval
     -float receiveFlightDuration
@@ -290,6 +291,8 @@ private float rootYOffset = 0.2f;
 private float pathMoveSlotSpacing = 0.3f;
 [SerializeField, Min(0.01f)]
 private float conveyorGroupGap = 0.6f;
+[Tooltip("Corner radius in board-local units. Applied when initializing the level; zero keeps sharp corners.")] [SerializeField, Min(0f)]
+private float cornerRadius = 0.7f;
 [Header("Transfer Setup")] [SerializeField, Min(0.01f)]
 private float transferSpeed = 4f;
 [SerializeField, Min(0f)]
@@ -701,7 +704,10 @@ class ConveyorBuilder {
     -SplineComputer splineComputer
     -SplineMesh splineMesh
     +ConveyorBuilder(SplineComputer splineComputer, SplineMesh splineMesh)
-    +BuildConveyor(BoardData boardData, PathData pathData, Transform boardRoot) void
+    +BuildConveyor(BoardData boardData, PathData pathData, Transform boardRoot, float cornerRadius = 0.7f) void
+    -CreateRoundedPoints(BoardData board, PathData path, Transform root, float radius) SplinePoint[]$
+    -CreatePoint(Transform root, Vector3 localPosition) SplinePoint$
+    -MergeStraightSegments(List~Vector3~ cells, bool closed) List~Vector3~$
     -Validate(BoardData boardData, PathData pathData, Transform boardRoot) void
 }
 class ConveyorBuoyGroup {
@@ -749,6 +755,8 @@ class ConveyorController {
     -Transform root
     -bool closed
     -float length
+    -float cornerRadius
+    +ConfigureCorners(float radius) void
     -ConveyorBuilder conveyorBuilder
     -List~PathMoveSlot~ _pathMoveSlots
     -List~EnterRequest~ waiting
@@ -815,7 +823,10 @@ Source: [Assets/Scripts/GameCore/BoardSystem/Conveyor/ConveyorBuilder.cs](../Ass
 private readonly SplineComputer splineComputer;
 private readonly SplineMesh splineMesh;
 public ConveyorBuilder(SplineComputer splineComputer, SplineMesh splineMesh)
-public void BuildConveyor(BoardData boardData, PathData pathData, Transform boardRoot)
+public void BuildConveyor(BoardData boardData, PathData pathData, Transform boardRoot, float cornerRadius = 0.7f)
+private static SplinePoint[] CreateRoundedPoints(BoardData board, PathData path, Transform root, float radius)
+private static SplinePoint CreatePoint(Transform root, Vector3 localPosition)
+private static List<Vector3> MergeStraightSegments(List<Vector3> cells, bool closed)
 private void Validate(BoardData boardData, PathData pathData, Transform boardRoot)
 ```
 
@@ -872,6 +883,8 @@ private BoardData board;
 private Transform root;
 private bool closed;
 private float length;
+private float cornerRadius = 0.7f;
+public void ConfigureCorners(float radius)
 private ConveyorBuilder conveyorBuilder;
 private readonly List<PathMoveSlot> _pathMoveSlots = new List<PathMoveSlot>();
 private readonly List<EnterRequest> waiting = new List<EnterRequest>();
@@ -1671,6 +1684,7 @@ public List<Vector3> data;
 
 ## Current behavior
 
+- ConveyorBuilder merges collinear grid cells and rounds turns with Bezier arcs using LevelManager.CornerRadius; straight sections and open endpoints are preserved. Mesh and groups share the rounded spline with Uniform distance sampling to avoid stretching extruded mesh copies on long straight segments.
 - Holder VisibleCapacity and decorations are fixed at initialization. The entire holder is disabled when no visible stack or pending column remains, after the final export completes. Only visible stacks are spawned; pending columns remain data.
 - The empty front stack is disabled after its outgoing transfer completes. The rear stack tweens forward while the replacement appears in the rear slot. Only the front accepts input and groups.
 - The holder root trigger detects a group using Enter/Stay. Group detection uses a trigger sphere and kinematic Rigidbody.

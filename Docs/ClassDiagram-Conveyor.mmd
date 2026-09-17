@@ -4,7 +4,10 @@ class ConveyorBuilder {
     -SplineComputer splineComputer
     -SplineMesh splineMesh
     +ConveyorBuilder(SplineComputer splineComputer, SplineMesh splineMesh)
-    +BuildConveyor(BoardData boardData, PathData pathData, Transform boardRoot) void
+    +BuildConveyor(BoardData boardData, PathData pathData, Transform boardRoot, float cornerRadius = 0.7f) void
+    -CreateRoundedPoints(BoardData board, PathData path, Transform root, float radius) SplinePoint[]$
+    -CreatePoint(Transform root, Vector3 localPosition) SplinePoint$
+    -MergeStraightSegments(List~Vector3~ cells, bool closed) List~Vector3~$
     -Validate(BoardData boardData, PathData pathData, Transform boardRoot) void
 }
 class ConveyorBuoyGroup {
@@ -52,6 +55,8 @@ class ConveyorController {
     -Transform root
     -bool closed
     -float length
+    -float cornerRadius
+    +ConfigureCorners(float radius) void
     -ConveyorBuilder conveyorBuilder
     -List~PathMoveSlot~ _pathMoveSlots
     -List~EnterRequest~ waiting
