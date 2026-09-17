@@ -3,7 +3,6 @@ using System;
 using System.Collections.Generic;
 using UnityEngine;
 using WaterConveyorSort.LevelData;
-using WaterConveyorSort.BoardSystem.Buoys;
 
 namespace WaterConveyorSort.BoardSystem.Conveyor
 {
@@ -37,20 +36,6 @@ namespace WaterConveyorSort.BoardSystem.Conveyor
         private readonly List<GroupPosition> positions = new List<GroupPosition>();
         private float slotSpacing = 0.3f;
         private float groupGap = 0.6f;
-        private readonly List<ReceiverPort> receivers = new List<ReceiverPort>();
-
-        public void ConfigureReceivers(IReadOnlyList<BuoyStackHolder> holders)
-        {
-            receivers.Clear();
-            foreach (BuoyStackHolder holder in holders)
-            {
-                if (holder.OutletDirection == Vector2Int.zero) continue;
-                Vector3 point = root.TransformPoint(BoardCoordinates.CellToLocal(board, holder.OutletCell));
-                float distance = splineComputer.CalculateLength(splineComputer.Project(point).percent, 1.0);
-                receivers.Add(new ReceiverPort { Holder = holder, Distance = closed ? Mathf.Repeat(distance, length) : distance });
-            }
-        }
-
         internal void RemoveGroup(ConveyorBuoyGroup group)
         {
             positions.RemoveAll(position => position.Group == group);
@@ -175,17 +160,6 @@ namespace WaterConveyorSort.BoardSystem.Conveyor
             foreach (GroupPosition position in positions)
             {
                 position.Step = position.Group.Moving ? (closed ? step : Mathf.Min(step, length - position.Distance)) : 0f;
-                position.Receiver = null;
-                if (!position.Group.Moving || !position.Group.IsLoaded) continue;
-                foreach (ReceiverPort receiver in receivers)
-                {
-                    float ahead = receiver.Distance - position.Distance;
-                    if (closed) ahead = Mathf.Repeat(ahead, length);
-                    if (ahead < 0f || ahead > position.Step || !receiver.Holder.CanReceive(position.Group)) continue;
-                    position.Step = ahead;
-                    position.Receiver = receiver;
-                    position.ReceiverTravel = ahead;
-                }
             }
             // Propagate a stopped/loading group's constraint backwards through the queue.
             // Simultaneous steps let a full moving loop advance without slot deadlock.
@@ -208,8 +182,6 @@ namespace WaterConveyorSort.BoardSystem.Conveyor
                 position.Distance += position.Step;
                 if (closed) position.Distance = Mathf.Repeat(position.Distance, length);
                 PlaceGroup(position);
-                if (position.Receiver != null && position.Step >= position.ReceiverTravel)
-                    position.Receiver.Holder.TryReceive(position.Group);
             }
             ProcessEntries();
         }
@@ -223,13 +195,6 @@ namespace WaterConveyorSort.BoardSystem.Conveyor
         {
             public ConveyorBuoyGroup Group;
             public float Distance, Step;
-            public ReceiverPort Receiver;
-            public float ReceiverTravel;
-        }
-        private sealed class ReceiverPort
-        {
-            public BuoyStackHolder Holder;
-            public float Distance;
         }
         private sealed class EnterRequest
         {
@@ -244,7 +209,6 @@ namespace WaterConveyorSort.BoardSystem.Conveyor
             groups.Clear();
             positions.Clear();
             waiting.Clear();
-            receivers.Clear();
         }
         private void OnDestroy() => ClearGroups();
 

@@ -32,6 +32,8 @@ namespace WaterConveyorSort.LevelSystem
         [Header("Transfer Setup")]
         [SerializeField, Min(0.01f)] private float transferSpeed = 4f;
         [SerializeField, Min(0f)] private float launchInterval = 0.12f;
+        [Header("Conveyor To Stack")]
+        [SerializeField] private BuoyReceiveConfig receiveConfig;
 
         private void OnValidate()
         {
@@ -42,6 +44,7 @@ namespace WaterConveyorSort.LevelSystem
         private void ApplyMotionSettings()
         {
             if (boardManager != null) boardManager.SetMotionSettings(transferSpeed, launchInterval);
+            if (boardManager != null) boardManager.SetReceiveConfig(receiveConfig);
             if (conveyorController != null) conveyorController.SetMotionSettings(moveSpeed, rootYOffset);
         }
 

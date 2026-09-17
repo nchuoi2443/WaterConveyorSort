@@ -1,0 +1,44 @@
+classDiagram
+direction LR
+class Outline {
+    -HashSet~Mesh~ registeredMeshes$
+    +Mode OutlineMode
+    +Color OutlineColor
+    +float OutlineWidth
+    -Mode outlineMode
+    -Color outlineColor
+    -float outlineWidth
+    -bool precomputeOutline
+    -List~Mesh~ bakeKeys
+    -List~ListVector3~ bakeValues
+    -Renderer[] renderers
+    -Material outlineMaskMaterial
+    -Material outlineFillMaterial
+    -bool needsUpdate
+    -int _stencilCounter$
+    -int _stencilID
+    -Awake() void
+    -OnEnable() void
+    -OnValidate() void
+    -Update() void
+    -OnDisable() void
+    -OnDestroy() void
+    -Bake() void
+    -LoadSmoothNormals() void
+    -SmoothNormals(Mesh mesh) List~Vector3~
+    -CombineSubmeshes(Mesh mesh, Material[] materials) void
+    +UpdateMaterialProperties() void
+}
+MonoBehaviour <|-- Outline
+class Mode {
+    <<enumeration>>
+    OutlineAll
+    OutlineVisible
+    OutlineHidden
+    OutlineAndSilhouette
+    SilhouetteOnly
+}
+class ListVector3 {
+    +List~Vector3~ data
+}
+Outline *-- ListVector3

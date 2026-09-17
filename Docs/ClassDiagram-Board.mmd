@@ -1,0 +1,70 @@
+classDiagram
+direction LR
+class BoardCoordinates {
+    +CellToLocal(BoardData board, Vector2Int cell) Vector3$
+}
+class BoardManager {
+    -Transform boardRoot
+    -ConveyorController conveyorController
+    -BuoyVisual buoyPrefab
+    -BuoyStackVisual buoyStackPrefab
+    -BuoyStackHolderVisual buoyStackHolderPrefab
+    -InputSystem inputSystem
+    -float transferSpeed
+    -float launchInterval
+    -BuoyReceiveConfig receiveConfig
+    +SetReceiveConfig(BuoyReceiveConfig config) void
+    +Configure(Transform root, ConveyorController conveyor, InputSystem input, BuoyVisual buoy, BuoyStackVisual stack, BuoyStackHolderVisual holder) void
+    +SetMotionSettings(float speed, float interval) void
+    -BuoyTransferController transfers
+    -LateUpdate() void
+    -BuoyStackHolderController buoyStackHolderController
+    +InitBoard(BoardData boardData, PathData pathData, IReadOnlyList~BuoyNodeData~ nodes, ColorDataSO colors) void
+    -OnDestroy() void
+}
+MonoBehaviour <|-- BoardManager
+class IInputReceiver {
+    <<interface>>
+    +bool CanReceiveInput
+    +OnClick() void
+}
+class InputSystem {
+    -Camera inputCamera
+    -LayerMask raycastMask
+    -float maxDistance
+    -Dictionary~Collider_IInputReceiver~ receivers
+    -List~RaycastResult~ uiHits
+    +Register(Collider inputCollider, IInputReceiver receiver) void
+    +Unregister(Collider inputCollider, IInputReceiver receiver) void
+    -Update() void
+    -ProcessPress(Vector2 screenPosition, int pointerId) void
+    -IsOverUI(Vector2 screenPosition, int pointerId) bool
+    -OnDestroy() void
+}
+MonoBehaviour <|-- InputSystem
+class LevelManager {
+    -LevelDataSO levelData
+    -BoardManager boardManager
+    -Transform boardRoot
+    -ConveyorController conveyorController
+    -InputSystem inputSystem
+    -BuoyVisual buoyPrefab
+    -BuoyStackVisual buoyStackPrefab
+    -BuoyStackHolderVisual buoyStackHolderPrefab
+    -SplineComputer splineComputer
+    -SplineMesh splineMesh
+    -float moveSpeed
+    -float rootYOffset
+    -float pathMoveSlotSpacing
+    -float conveyorGroupGap
+    -float transferSpeed
+    -float launchInterval
+    -BuoyReceiveConfig receiveConfig
+    -OnValidate() void
+    -ApplyMotionSettings() void
+    -Start() void
+    +InitLevel() void
+}
+MonoBehaviour <|-- LevelManager
+LevelManager --> BoardManager : initializes
+InputSystem --> IInputReceiver : dispatches clicks

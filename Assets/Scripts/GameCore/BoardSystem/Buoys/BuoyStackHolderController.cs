@@ -47,9 +47,9 @@ namespace WaterConveyorSort.BoardSystem.Buoys
                         visual.transform.localRotation = Quaternion.identity;
                         var holder = new BuoyStackHolder(node, visual);
                         holders.Add(holder);
-                        // Spawn the queue; the holder activates its first non-empty stack after initialization.
-                        for (int i = 0; i < node.Columns.Count; i++)
-                            CreateStack(holder, visual.transform, node.Columns[i], i, colors, stackPrefab, buoyPrefab, inputSystem);
+                        int nextStackIndex = 0;
+                        holder.InitializeStacks(source => CreateStack(visual.transform, source, nextStackIndex++,
+                            colors, stackPrefab, buoyPrefab, inputSystem));
                     }
                     catch { visual.Release(); throw; }
                 }
@@ -57,7 +57,7 @@ namespace WaterConveyorSort.BoardSystem.Buoys
             catch { Clear(); throw; }
         }
 
-        private static void CreateStack(BuoyStackHolder holder, Transform parent, BuoyColumnData source,
+        private static BuoyStack CreateStack(Transform parent, BuoyColumnData source,
             int index, ColorDataSO colors, BuoyStackVisual stackPrefab, BuoyVisual buoyPrefab, InputSystem inputSystem)
         {
             BuoyStackVisual visual = Object.Instantiate(stackPrefab, parent);
@@ -65,7 +65,6 @@ namespace WaterConveyorSort.BoardSystem.Buoys
             {
                 visual.name = $"Stack_{index}";
                 var stack = new BuoyStack(source, visual);
-                holder.AddStack(stack, visual);
                 visual.BindInput(stack, inputSystem);
                 for (int i = 0; i < source.Buoys.Count; i++)
                 {
@@ -78,6 +77,7 @@ namespace WaterConveyorSort.BoardSystem.Buoys
                     }
                     catch { buoyVisual.Release(); throw; }
                 }
+                return stack;
             }
             catch { visual.Release(); throw; }
         }

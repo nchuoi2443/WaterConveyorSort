@@ -1,0 +1,157 @@
+classDiagram
+direction LR
+class Buoy {
+    -BuoyVisual visual
+    +int ColorCode
+    +BuoyElementType Type
+    +int TypeCount
+    +IReadOnlyList~string~ Elements
+    ~BuoyVisual Visual
+    -bool cleared
+    +Buoy(BuoyData source, ColorDataSO colors, BuoyVisual visual)
+    +Clear() void
+}
+class BuoyColorConfig {
+    -List~ColorMaterialEntry~ colors
+    -Dictionary~int_Material~ materials
+    +GetMaterial(int colorId) Material
+    -OnEnable() void
+    -OnValidate() void
+    -BuildLookup() void
+}
+ScriptableObject <|-- BuoyColorConfig
+class ColorMaterialEntry {
+    -int colorId
+    -Material material
+    +int ColorId
+    +Material Material
+}
+class BuoyStack {
+    -BuoyStackVisual visual
+    -List~Buoy~ buoys
+    -bool cleared
+    ~BuoyStackVisual Visual
+    -bool canReceiveInput
+    +bool CanReceiveInput
+    +GetTopGroup() List~Buoy~
+    ~RemoveTop(Buoy buoy) void
+    +Action~BuoyStack~ Clicked
+    +IReadOnlyList~Buoy~ Buoys
+    +ColumnElementType Type
+    +int TypeCount
+    +IReadOnlyList~string~ Elements
+    +BuoyStack(BuoyColumnData source, BuoyStackVisual visual)
+    ~AddBuoy(Buoy buoy) void
+    +OnClick() void
+    +Clear() void
+}
+class BuoyStackHolder {
+    -BuoyStackHolderVisual visual
+    -List~BuoyStack~ stacks
+    -Queue~BuoyColumnData~ pending
+    -Func~BuoyColumnData_BuoyStack~ createStack
+    -BuoyTransferController transfer
+    -bool busy
+    -bool cleared
+    +IReadOnlyList~BuoyStack~ Stacks
+    +BuoyStack ActiveStack
+    +int VisibleCapacity
+    +Vector2Int GridPosition
+    +Vector2Int OutletDirection
+    +Vector2Int OutletCell
+    +BuoyStackHolder(BuoyNodeData source, BuoyStackHolderVisual visual)
+    ~InitializeStacks(Func~BuoyColumnData_BuoyStack~ factory) void
+    -FillVisibleStacks() void
+    ~ContainsGroup(ConveyorBuoyGroup group) bool
+    ~CanReceive(ConveyorBuoyGroup group) bool
+    ~TryReceive(ConveyorBuoyGroup group) bool
+    +InitializeTransfers(BuoyTransferController controller) void
+    -OnStackClicked(BuoyStack stack) void
+    -FinishTransfer() void
+    -FinishQueueAdvance() void
+    -RefreshInput() void
+    +Clear() void
+}
+class BuoyStackHolderController {
+    -List~BuoyStackHolder~ holders
+    +IReadOnlyList~BuoyStackHolder~ Holders
+    +BuoyStackHolderController()
+    +InitHolders(BoardData board, IReadOnlyList~BuoyNodeData~ nodes, ColorDataSO colors, Transform boardRoot, BuoyStackHolderVisual holderPrefab, BuoyStackVisual stackPrefab, BuoyVisual buoyPrefab, InputSystem inputSystem) void
+    -CreateStack(Transform parent, BuoyColumnData source, int index, ColorDataSO colors, BuoyStackVisual stackPrefab, BuoyVisual buoyPrefab, InputSystem inputSystem) BuoyStack$
+    +Clear() void
+}
+class BuoyStackHolderVisual {
+    -GameObject singleStackVisual
+    -GameObject multipleStackVisual
+    -Transform stackRoot
+    -Vector3 firstStackOffset
+    -Vector3 stackStep
+    +SetOutletDirection(Vector2Int direction) void
+    -Collider receiveCollider
+    -float advanceDuration
+    -BuoyStackHolder owner
+    -Coroutine advanceTween
+    +Initialize(BuoyStackHolder holder, int visibleCapacity) void
+    ~ContainsGroup(ConveyorBuoyGroup group) bool
+    -OnTriggerEnter(Collider other) void
+    -OnTriggerStay(Collider other) void
+    -DetectGroup(Collider other) void
+    +TweenToFront(Transform stack, Action completed) void
+    -AdvanceStack(Transform stack, Action completed) IEnumerator
+    +PlaceStack(Transform stack, int index) void
+    -bool released
+    +Release() void
+}
+MonoBehaviour <|-- BuoyStackHolderVisual
+class BuoyStackVisual {
+    -Transform buoyRoot
+    -Vector3 firstBuoyOffset
+    -float buoySpacing
+    -float buoyHeight
+    -Transform poleTransform
+    +float Step
+    -Vector3 poleScale, polePosition
+    -Bounds poleBounds
+    -bool poleCached
+    -bool inputEnabled
+    -int count
+    +SetInputEnabled(bool enabled) void
+    +RefreshHeight(int buoyCount) void
+    -Collider[] inputColliders
+    -InputSystem inputSystem
+    -BuoyStack owner
+    +bool CanReceiveInput
+    +BindInput(BuoyStack stack, InputSystem system) void
+    +OnClick() void
+    -OnEnable() void
+    -OnDisable() void
+    -RegisterInput() void
+    -UnregisterInput() void
+    +GetBuoyPosition(int index) Vector3
+    +PlaceBuoy(Transform buoy, int index) void
+    -bool released
+    +Release() void
+}
+MonoBehaviour <|-- BuoyStackVisual
+IInputReceiver <|.. BuoyStackVisual
+class BuoyVisual {
+    -Renderer[] colorRenderers
+    -BuoyColorConfig colorConfig
+    -MaterialPropertyBlock propertyBlock
+    -int BaseColor$
+    +Refresh(int colorId, Color color) void
+    +MoveTowards(Vector3 target, float distance) bool
+    -bool released
+    +Release() void
+}
+MonoBehaviour <|-- BuoyVisual
+BuoyStackHolderController *-- BuoyStackHolder
+BuoyStackHolderController ..> BuoyStack : lazy factory
+BuoyStackHolder *-- BuoyStack : visible slots
+BuoyStackHolder --> BuoyStackHolderVisual
+BuoyStackHolderVisual --> BuoyStackHolder : trigger detection
+BuoyStack *-- Buoy
+BuoyStack --> BuoyStackVisual
+Buoy --> BuoyVisual
+BuoyVisual --> BuoyColorConfig
+BuoyColorConfig *-- ColorMaterialEntry

@@ -1396,6 +1396,7 @@ MonoBehaviour:
   conveyorGroupGap: 0.9
   transferSpeed: 4
   launchInterval: 0.12
+  receiveConfig: {fileID: 11400000, guid: a13367c018a74ddeabc622add2f32b2b, type: 2}
 --- !u!4 &1043360161
 Transform:
   m_ObjectHideFlags: 0

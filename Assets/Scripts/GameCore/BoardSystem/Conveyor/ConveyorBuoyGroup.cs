@@ -11,6 +11,18 @@ namespace WaterConveyorSort.BoardSystem.Conveyor
         internal double Percent;
         internal bool Moving;
         internal bool IsLoaded { get; set; }
+        internal bool IsReceiving { get; set; }
+        internal BuoyStackHolder DepartureHolder { get; set; }
+        public float DetectionRadius => detectionCollider != null ?
+            detectionCollider.radius * Mathf.Max(Mathf.Abs(transform.lossyScale.x),
+                Mathf.Abs(transform.lossyScale.y), Mathf.Abs(transform.lossyScale.z)) : 0f;
+        private SphereCollider detectionCollider;
+        private Rigidbody body;
+
+        private void Update()
+        {
+            if (DepartureHolder != null && !DepartureHolder.ContainsGroup(this)) DepartureHolder = null;
+        }
         public bool HasColor(int colorCode) => buoys.Count > 0 && buoys.TrueForAll(buoy => buoy.ColorCode == colorCode);
         internal Buoy TakeTop()
         {
@@ -22,7 +34,17 @@ namespace WaterConveyorSort.BoardSystem.Conveyor
         }
         private float spacing;
         public void Initialize(double percent, float spacing)
-        { Percent = percent; this.spacing = spacing; }
+        {
+            Percent = percent;
+            this.spacing = spacing;
+            gameObject.layer = LayerMask.NameToLayer("Ignore Raycast");
+            detectionCollider = gameObject.AddComponent<SphereCollider>();
+            detectionCollider.radius = 0.12f;
+            detectionCollider.isTrigger = true;
+            body = gameObject.AddComponent<Rigidbody>();
+            body.useGravity = false;
+            body.isKinematic = true;
+        }
         public Vector3 GetSlotPosition(int slot) => transform.TransformPoint(Vector3.up * (slot * spacing));
         public void Receive(Buoy buoy, int slot)
         {

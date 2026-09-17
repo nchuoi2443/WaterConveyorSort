@@ -1,0 +1,59 @@
+classDiagram
+direction LR
+class BuoyReceiveConfig {
+    -float flightDuration
+    -float launchDelay
+    +float FlightDuration
+    +float LaunchDelay
+}
+ScriptableObject <|-- BuoyReceiveConfig
+class BuoyTransferController {
+    -List~Transfer~ transfers
+    -List~ReceiveTransfer~ receives
+    -ConveyorController conveyor
+    -int generation
+    -float flightSpeed
+    -BuoyReceiveConfig receiveConfig
+    +SetReceiveConfig(BuoyReceiveConfig config) void
+    +BuoyTransferController(ConveyorController conveyor)
+    ~BeginReceive(BuoyStack stack, ConveyorBuoyGroup group, Action completed) void
+    +Begin(BuoyStack stack, Vector2Int outlet, BuoyStackHolder sourceHolder, Action completed) void
+    +Tick(float deltaTime, float speed, float interval) void
+    -LaunchReceiveFlights(ReceiveTransfer transfer) void$
+    -TickReceives(float deltaTime) void
+    +Clear() void
+}
+class Transfer {
+    +BuoyStack Stack
+    +List~Buoy~ Selected
+    +ConveyorBuoyGroup Group
+    +Action Completed
+    +List~Flight~ Flights
+    +int Next, Arrived
+    +float Timer, Elapsed, ExpectedArrival
+}
+class ReceiveTransfer {
+    +BuoyStack Stack
+    +ConveyorBuoyGroup Group
+    +Action Completed
+    +List~ReceiveFlight~ Flights
+    +int BaseIndex, Count, Next, Arrived
+    +float Elapsed, Duration, Delay
+}
+class ReceiveFlight {
+    +Buoy Buoy
+    +int Slot
+    +Vector3 StartPosition
+    +float LaunchTime
+    +bool Arrived
+}
+class Flight {
+    +Buoy Buoy
+    +int Slot
+    +bool Arrived
+}
+BuoyTransferController --> BuoyReceiveConfig : snapshot timing
+BuoyTransferController *-- Transfer
+BuoyTransferController *-- ReceiveTransfer
+Transfer *-- Flight
+ReceiveTransfer *-- ReceiveFlight

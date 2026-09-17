@@ -13,7 +13,7 @@ LevelManager -> BoardManager -> BuoyStackHolderController -> BuoyStackHolder -> 
 BoardManager owns the three serialized Visual prefab references and passes them to the controller. Only Visual classes are MonoBehaviours within the buoy system. The controller creates Visual instances and constructs plain C# BuoyStackHolder, BuoyStack and Buoy objects. Runtime objects own their state and command their visuals; visuals never modify gameplay collections.
 Each node maps to a holder; each column maps to a stack; each buoy entry maps to a buoy.
 Columns keep source order, with index zero as the active stack. Buoys keep source order from bottom to top, matching the editor.
-All columns are spawned. Only the first non-empty stack accepts input. A tap exports the consecutive top color group. Empty stacks advance after all flights finish. Conveyor capacity and special element rules are not implemented.
+Only the initial one or two visible stacks are spawned. Remaining non-empty columns stay queued as data. Only the front stack accepts input and incoming groups. A tap exports the consecutive top color group. Empty front stacks advance after all flights finish. Conveyor admission respects the configured gap; special element rules are not implemented.
 Buoy and BuoyStack directly hold copied values and element IDs from the level asset; there is no nested RuntimeData wrapper. Spawned object lists are runtime collections. Gameplay must not mutate the level asset.
 
 ## Visual configuration
@@ -21,7 +21,7 @@ Buoy and BuoyStack directly hold copied values and element IDs from the level as
 Each prefab has its corresponding Visual component with references to your authored models.
 BuoyVisual colors only assigned renderers through MaterialPropertyBlock using the Ring shader's _Color property, without changing shared materials or creating material instances. The Ring shader is unchanged; this does not add GPU instancing support to it.
 BuoyStackVisual controls the first buoy offset and vertical spacing.
-BuoyStackHolderVisual selects single/multiple decorations and controls the first stack offset and queue direction/spacing. Keep decorative roots separate from stackRoot.
+BuoyStackHolderVisual selects permanent single/multiple decorations during initialization and controls slot positions, queue tweening and trigger detection. Keep decorative roots separate from stackRoot.
 The holder passes OutletDirection to its Visual, which rotates local +Z toward the outlet in board coordinates. Up/right/down/left map to Y rotations of 0/90/180/-90 degrees. Unconfigured nodes keep identity rotation. Keep stackRoot under the holder with identity local rotation to align the stack queue; offset model orientation on a decorative child if needed. The default negative-Z stackStep places waiting stacks behind the outlet-facing stack.
 Holder positions and conveyor points share BoardCoordinates and BoardData.CellSize. Keep boardRoot and its ancestors at unit scale for world-unit sizing.
 The conveyor channel configuration is untouched.
@@ -32,7 +32,7 @@ The conveyor channel configuration is untouched.
 
 BoardManager resolves or creates an InputSystem component during initialization. For Inspector configuration, add the component before entering Play Mode and assign its camera, raycast mask and distance. Without an assigned camera it uses Camera.main.
 
-BuoyStackVisual implements IInputReceiver. The controller binds each stack visual to its BuoyStack and InputSystem before spawning its buoys. Assign Input Colliders on the stack visual; an empty array uses colliders on the same GameObject only, so individual buoy colliders are never collected. RingStack.prefab explicitly references its enabled, non-trigger capsule collider on the Buoy layer. Ring.prefab's mesh collider is disabled.
+BuoyStackVisual implements IInputReceiver. The controller binds each stack visual to its BuoyStack and InputSystem before spawning its buoys. Assign Input Colliders on the stack visual; an empty array uses colliders on the same GameObject only, so individual buoy colliders are never collected. RingStack.prefab explicitly references its enabled, non-trigger capsule collider on the BuoyStack layer. Ring.prefab's mesh collider is disabled.
 
 Mouse down or the primary touch beginning dispatches one stack click. UI GraphicRaycaster hits block board input when an EventSystem is present. Disabling the stack visual unregisters its colliders; enabling registers them again. Clearing a stack releases its registration and click subscribers.
 
@@ -43,7 +43,7 @@ The holder subscribes to BuoyStack.Clicked and locks the source for the full tra
 - Disable and re-enable a stack visual, then reinitialize the board: only active, current stacks should receive input.
 
 - One column: one holder, one stack, matching buoy count and bottom-to-top colors.
-- Three columns including an empty column: three stacks in source order, with no buoys on the empty stack.
+- Three columns including an empty column: at most two visible stacks in source order; empty data columns are skipped.
 - Reinitialize in Play Mode: old spawned holders are hidden immediately and destroyed; counts do not accumulate.
 - Restart Play Mode: the source level data is unchanged.
 - Change board CellSize: holder cell centers continue to align with conveyor cell centers.
@@ -55,11 +55,31 @@ BoardManager clears its controller when destroyed. Reinitialization clears old r
 
 ## Stack to conveyor transfers
 
+## Fixed holder visuals and lazy queue
+
+The initial column count chooses a permanent one-slot or two-slot holder decoration (two slots when the count is greater than one). Only those visible stacks are instantiated; remaining non-empty columns stay in a data queue. The front stack alone accepts input and groups. Empty data columns are skipped.
+
+After the final outgoing buoy arrives, the empty front stack is disabled and released. The rear stack advances to the front with a coroutine tween; a replacement is spawned in the rear slot at the same time if queued data remains. One-slot holders replace the front directly. The original holder decoration remains visible even when its queue is exhausted. Advance Duration on StackHolder.prefab defaults to 0.3 seconds. Holder input and receiving are locked during the tween, which is cancelled on level reset.
+
 ## Conveyor to stack transfers
 
-The holder's configured OutletCell also serves as its receiving port; there is no separate inlet direction in the current level data. Conveyor movement detects crossing this port along the spline, including loop wrap, and stops an eligible group there. Only fully loaded groups whose buoys all match the active stack's top color can return. Empty, busy, and unconfigured holders do not receive groups. Other groups continue along the conveyor.
+The root trigger collider on StackHolder.prefab is assigned as Receive Collider. Keep the trigger volume extending toward the conveyor and overlapping the group root at the configured Root Y Offset. The group adds a small trigger sphere and kinematic Rigidbody at initialization; its Ignore Raycast layer prevents interference with click input. The project's layer collision matrix currently permits these contacts.
 
-The holder locks input while receiving. Buoys leave the group's top and fly to the next free stack position in sequence, using Transfer Speed and Launch Interval. The stopped group retains its conveyor reservation until the last buoy lands, then is removed and the holder unlocks. Reset clears any receiving flight before stacks and conveyor groups are destroyed.
+OnTriggerEnter and OnTriggerStay check the active stack's top color. Only fully loaded, unclaimed groups with matching color are accepted. Empty, busy and unconfigured holders do not receive. Stay allows a group that finishes loading or encounters a holder finishing its tween within the volume to be checked again. Only the front stack receives, not the waiting rear stack.
+
+Accepted groups keep moving. The transfer launches overlapping flights from the group's top using BuoyReceiveConfig Launch Delay and Flight Duration, reserving destination indices and committing landings in order. Unlaunched buoys remain parented to the moving group. IsReceiving claims the group so other holders cannot receive it, even after it leaves the trigger. The empty group keeps moving until all flights land, then its conveyor reservation and GameObject are removed. The destination unlocks after completion.
+
+DepartureHolder prevents a freshly exported group from immediately returning to its source; this exclusion clears once the group leaves the source trigger volume. Reset clears all unlanded flights before stacks and groups are destroyed.
+
+Play Mode checks:
+- Initialize holders with one, two and more than two columns; confirm at most two stack GameObjects are spawned and decorations remain fixed.
+- Empty the front of a two-slot holder; verify the rear tweens forward while the next queued column appears in the rear slot.
+- Exhaust all columns; keep the original holder decoration and disable click/receive behavior.
+- Pass matching and mismatching groups through the trigger; only the matching group transfers and its root continues moving.
+- Pass the same receiving group through another holder; do not duplicate or redirect the transfer.
+- Export a group while it overlaps its source trigger; prevent immediate return, then allow return on a later loop.
+- Reset during queue tween or overlapping receive flights; leave no orphan buoy, stale callback or group reservation.
+- Check high conveyor speeds against the trigger width in Play Mode; physics detects overlaps on its fixed update schedule.
 
 ## Stack to conveyor transfer scheduling
 
@@ -69,7 +89,7 @@ ConveyorController projects the holder's OutletCell (GridPosition + OutletDirect
 
 Each tap reserves one group and one slot per buoy, in top-to-bottom launch order. The group stays still until slot zero receives its buoy, then starts moving immediately. Flights chase the current world position of their slot every frame. Parent changes only on arrival. Buoys in flight belong to the transfer controller; source roots stay alive and stationary until the transfer completes. On reset, flights are cleared before source stacks and conveyor groups.
 
-Buoy Height is 0.2 and Buoy Spacing is 0 on RingStack.prefab to preserve its previous 0.2 placement step. Adjust these to the authored mesh dimensions. Pole Transform references Stick. Its mesh bounds determine scaling while preserving the original base. Height is count * buoyHeight + max(0, count - 1) * spacing; empty poles are hidden. Capsule height follows the stack but cannot shrink below its diameter. Queue advancement currently repositions the remaining stacks immediately.
+Buoy Height is 0.2 and Buoy Spacing is 0 on RingStack.prefab to preserve its previous 0.2 placement step. Adjust these to the authored mesh dimensions. Pole Transform references Stick. Its mesh bounds determine scaling while preserving the original base. Height is count * buoyHeight + max(0, count - 1) * spacing; empty poles are hidden. Capsule height follows the stack but cannot shrink below its diameter. Queue advancement uses the fixed visual slots and coroutine tween described above.
 
 Manual verification:
 - Top-to-bottom red/red/blue/red: one tap exports only the first two reds into one group.
@@ -88,4 +108,10 @@ ConveyorController builds _pathMoveSlots in backward spline order, samples dista
 
 Entry requests preserve arrival order within overlapping entry regions; blocked requests do not stall independent entry points. No source buoy leaves and no pole shrinks until admission succeeds. A newly admitted stationary group immediately reserves space. Movement constraints propagate backward from blocked groups, including across the loop seam; a full loop of moving groups can still advance together. Open paths stop at the end. Capacity depends on path length and configured gap. The gap is measured along the path, not between nearby parallel tracks in world space.
 
-Verify simultaneous holder taps, a blocked entry, a loading group with followers, a full moving loop, zero speed, and reinitialization with pending requests in Play Mode. Waiting for space intentionally keeps the source locked. Future conveyor-to-stack removal must release the group reservation as well as its visual.
+Verify simultaneous holder taps, a blocked entry, a loading group with followers, a full moving loop, zero speed, and reinitialization with pending requests in Play Mode. Waiting for space intentionally keeps the source locked. Conveyor-to-stack completion releases the group reservation and its GameObject.
+
+## Receive timing config
+
+Assets/Settings/BuoyReceiveConfig.asset is assigned to SampleScene's LevelManager under Conveyor To Stack / Receive Config. Flight Duration defaults to 0.4 seconds; Launch Delay defaults to 0.12 seconds. The first buoy launches immediately; buoy i launches at i * Launch Delay and lands at that time plus Flight Duration. Zero delay launches all buoys together. Receive flights interpolate from their launch position to the stack position over the configured duration, independent of travel distance and outgoing Transfer Speed.
+
+Timing is copied at the start of each receive transfer, so config edits apply to subsequent groups. If no asset is assigned, duration/delay default to 0.4/0.12 seconds. Create additional configs from Create > Water Conveyor Sort > Buoy Receive Config and assign them on LevelManager. Stack-to-conveyor flight speed and launch interval remain on LevelManager's Transfer Setup.

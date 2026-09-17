@@ -1,0 +1,83 @@
+classDiagram
+direction LR
+class ConveyorBuilder {
+    -SplineComputer splineComputer
+    -SplineMesh splineMesh
+    +ConveyorBuilder(SplineComputer splineComputer, SplineMesh splineMesh)
+    +BuildConveyor(BoardData boardData, PathData pathData, Transform boardRoot) void
+    -Validate(BoardData boardData, PathData pathData, Transform boardRoot) void
+}
+class ConveyorBuoyGroup {
+    -List~Buoy~ buoys
+    +IReadOnlyList~Buoy~ Buoys
+    ~double Percent
+    ~bool Moving
+    ~bool IsLoaded
+    ~bool IsReceiving
+    ~BuoyStackHolder DepartureHolder
+    +float DetectionRadius
+    -SphereCollider detectionCollider
+    -Rigidbody body
+    -Update() void
+    +HasColor(int colorCode) bool
+    ~TakeTop() Buoy
+    -float spacing
+    +Initialize(double percent, float spacing) void
+    +GetSlotPosition(int slot) Vector3
+    +Receive(Buoy buoy, int slot) void
+    +Clear() void
+    -OnDestroy() void
+}
+MonoBehaviour <|-- ConveyorBuoyGroup
+class ConveyorController {
+    -SplineComputer splineComputer
+    -SplineMesh splineMesh
+    -float moveSpeed
+    -float rootYOffset
+    +Configure(SplineComputer computer, SplineMesh mesh) void
+    +SetMotionSettings(float speed, float yOffset) void
+    +float MoveSpeed
+    -List~ConveyorBuoyGroup~ groups
+    -BoardData board
+    -Transform root
+    -bool closed
+    -float length
+    -ConveyorBuilder conveyorBuilder
+    -List~PathMoveSlot~ _pathMoveSlots
+    -List~EnterRequest~ waiting
+    -List~GroupPosition~ positions
+    -float slotSpacing
+    -float groupGap
+    ~RemoveGroup(ConveyorBuoyGroup group) void
+    +ConfigurePathSlots(float spacing, float minimumGap) void
+    +RequestEntry(Vector2Int outletCell, float spacing, Func~Vector3_float~ estimateArrival, Action~ConveyorBuoyGroup~ accepted) void
+    -ProcessEntries() void
+    +CanReceiveFirst(ConveyorBuoyGroup group) bool
+    +GetEntryHoldingOffset() Vector3
+    -EntryDistance(float a, float b) float
+    -PercentAt(float distance) double
+    -PlaceGroup(GroupPosition position) void
+    -Update() void
+    +ClearGroups() void
+    -OnDestroy() void
+    +InitConveyor(BoardData boardData, PathData pathData, Transform boardRoot) void
+}
+MonoBehaviour <|-- ConveyorController
+class PathMoveSlot {
+    +float Distance
+    +double Percent
+}
+class GroupPosition {
+    +ConveyorBuoyGroup Group
+    +float Distance, Step
+}
+class EnterRequest {
+    +float Distance, Spacing
+    +Func~Vector3_float~ EstimateArrival
+    +Action~ConveyorBuoyGroup~ Accepted
+}
+ConveyorController *-- ConveyorBuilder
+ConveyorController *-- ConveyorBuoyGroup
+ConveyorController *-- PathMoveSlot
+ConveyorController *-- GroupPosition
+ConveyorController *-- EnterRequest

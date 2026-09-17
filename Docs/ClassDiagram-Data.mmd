@@ -1,0 +1,103 @@
+classDiagram
+direction LR
+class LevelDataSO {
+    -ColorDataSO colorData
+    -BoardData board
+    -PathData path
+    -List~BuoyNodeData~ buoyNodes
+    +ColorDataSO ColorData
+    +BoardData Board
+    +PathData Path
+    +IReadOnlyList~BuoyNodeData~ BuoyNodes
+}
+ScriptableObject <|-- LevelDataSO
+class BoardData {
+    -int width
+    -int height
+    -float cellSize
+    +int Width
+    +int Height
+    +float CellSize
+}
+class PathData {
+    -bool isClosed
+    -List~Vector2Int~ cells
+    +bool IsClosed
+    +IReadOnlyList~Vector2Int~ Cells
+}
+class BuoyNodeData {
+    -Vector2Int gridPosition
+    -Vector2Int outletDirection
+    -List~BuoyColumnData~ columns
+    +Vector2Int GridPosition
+    +Vector2Int OutletDirection
+    +Vector2Int OutletCell
+    +IReadOnlyList~BuoyColumnData~ Columns
+}
+class BuoyColumnData {
+    +int DefaultBuoyCount$
+    -ColumnElementType columnType
+    -int columnTypeCount
+    -List~ColumnElementData~ elements
+    -List~BuoyData~ buoys
+    +ColumnElementType ColumnType
+    +int ColumnTypeCount
+    +IReadOnlyList~ColumnElementData~ Elements
+    +IReadOnlyList~BuoyData~ Buoys
+    +int BuoyCount
+    -CreateDefaultBuoys() List~BuoyData~$
+}
+class BuoyData {
+    -int colorCode
+    -BuoyElementType buoyType
+    -int buoyTypeCount
+    -List~BuoyElementData~ elements
+    +int ColorCode
+    +BuoyElementType BuoyType
+    +int BuoyTypeCount
+    +IReadOnlyList~BuoyElementData~ Elements
+}
+class ColumnElementData {
+    -string elementId
+    +string ElementId
+}
+class BuoyElementData {
+    -string elementId
+    +string ElementId
+}
+class ColorDataSO {
+    -List~ColorEntryData~ colors
+    +IReadOnlyList~ColorEntryData~ Colors
+    +TryGetColor(int code, out Color color) bool
+}
+ScriptableObject <|-- ColorDataSO
+class ColorEntryData {
+    -int code
+    -string displayName
+    -Color color
+    +int Code
+    +string DisplayName
+    +Color Color
+}
+class ColumnElementType {
+    <<enumeration>>
+    NormalPeg = 0
+    Crate = 1
+    LockedPeg = 2
+    IcePeg = 3
+    ConveyorCounterBouyTxt = 4
+}
+class BuoyElementType {
+    <<enumeration>>
+    NormalBouy = 0
+    Hidden = 1
+}
+LevelDataSO *-- BoardData
+LevelDataSO *-- PathData
+LevelDataSO *-- BuoyNodeData
+LevelDataSO --> ColorDataSO
+BuoyNodeData *-- BuoyColumnData
+BuoyColumnData *-- BuoyData
+BuoyColumnData *-- ColumnElementData
+BuoyData *-- BuoyElementData
+ColorDataSO *-- ColorEntryData

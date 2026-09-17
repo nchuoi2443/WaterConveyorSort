@@ -1,10 +1,8 @@
 classDiagram
 direction LR
-
 class BoardCoordinates {
     +CellToLocal(BoardData board, Vector2Int cell) Vector3$
 }
-
 class BoardManager {
     -Transform boardRoot
     -ConveyorController conveyorController
@@ -14,6 +12,8 @@ class BoardManager {
     -InputSystem inputSystem
     -float transferSpeed
     -float launchInterval
+    -BuoyReceiveConfig receiveConfig
+    +SetReceiveConfig(BuoyReceiveConfig config) void
     +Configure(Transform root, ConveyorController conveyor, InputSystem input, BuoyVisual buoy, BuoyStackVisual stack, BuoyStackHolderVisual holder) void
     +SetMotionSettings(float speed, float interval) void
     -BuoyTransferController transfers
@@ -22,50 +22,7 @@ class BoardManager {
     +InitBoard(BoardData boardData, PathData pathData, IReadOnlyList~BuoyNodeData~ nodes, ColorDataSO colors) void
     -OnDestroy() void
 }
-
-class IInputReceiver {
-    <<interface>>
-    +bool CanReceiveInput
-    +OnClick() void
-}
-
-class InputSystem {
-    -Camera inputCamera
-    -LayerMask raycastMask
-    -float maxDistance
-    -Dictionary~Collider_IInputReceiver~ receivers
-    -List~RaycastResult~ uiHits
-    +Register(Collider inputCollider, IInputReceiver receiver) void
-    +Unregister(Collider inputCollider, IInputReceiver receiver) void
-    -Update() void
-    -ProcessPress(Vector2 screenPosition, int pointerId) void
-    -IsOverUI(Vector2 screenPosition, int pointerId) bool
-    -OnDestroy() void
-}
-
-class LevelManager {
-    -LevelDataSO levelData
-    -BoardManager boardManager
-    -Transform boardRoot
-    -ConveyorController conveyorController
-    -InputSystem inputSystem
-    -BuoyVisual buoyPrefab
-    -BuoyStackVisual buoyStackPrefab
-    -BuoyStackHolderVisual buoyStackHolderPrefab
-    -SplineComputer splineComputer
-    -SplineMesh splineMesh
-    -float moveSpeed
-    -float rootYOffset
-    -float pathMoveSlotSpacing
-    -float conveyorGroupGap
-    -float transferSpeed
-    -float launchInterval
-    -OnValidate() void
-    -ApplyMotionSettings() void
-    -Start() void
-    +InitLevel() void
-}
-
+MonoBehaviour <|-- BoardManager
 class Buoy {
     -BuoyVisual visual
     +int ColorCode
@@ -77,7 +34,6 @@ class Buoy {
     +Buoy(BuoyData source, ColorDataSO colors, BuoyVisual visual)
     +Clear() void
 }
-
 class BuoyColorConfig {
     -List~ColorMaterialEntry~ colors
     -Dictionary~int_Material~ materials
@@ -86,14 +42,20 @@ class BuoyColorConfig {
     -OnValidate() void
     -BuildLookup() void
 }
-
+ScriptableObject <|-- BuoyColorConfig
 class ColorMaterialEntry {
     -int colorId
     -Material material
     +int ColorId
     +Material Material
 }
-
+class BuoyReceiveConfig {
+    -float flightDuration
+    -float launchDelay
+    +float FlightDuration
+    +float LaunchDelay
+}
+ScriptableObject <|-- BuoyReceiveConfig
 class BuoyStack {
     -BuoyStackVisual visual
     -List~Buoy~ buoys
@@ -113,37 +75,41 @@ class BuoyStack {
     +OnClick() void
     +Clear() void
 }
-
 class BuoyStackHolder {
     -BuoyStackHolderVisual visual
     -List~BuoyStack~ stacks
+    -Queue~BuoyColumnData~ pending
+    -Func~BuoyColumnData_BuoyStack~ createStack
+    -BuoyTransferController transfer
+    -bool busy
+    -bool cleared
     +IReadOnlyList~BuoyStack~ Stacks
     +BuoyStack ActiveStack
+    +int VisibleCapacity
     +Vector2Int GridPosition
     +Vector2Int OutletDirection
     +Vector2Int OutletCell
     +BuoyStackHolder(BuoyNodeData source, BuoyStackHolderVisual visual)
-    ~AddStack(BuoyStack stack, BuoyStackVisual stackVisual) void
-    -BuoyTransferController transfer
-    -bool busy
+    ~InitializeStacks(Func~BuoyColumnData_BuoyStack~ factory) void
+    -FillVisibleStacks() void
+    ~ContainsGroup(ConveyorBuoyGroup group) bool
     ~CanReceive(ConveyorBuoyGroup group) bool
     ~TryReceive(ConveyorBuoyGroup group) bool
     +InitializeTransfers(BuoyTransferController controller) void
     -OnStackClicked(BuoyStack stack) void
     -FinishTransfer() void
-    -AdvanceQueue() void
+    -FinishQueueAdvance() void
+    -RefreshInput() void
     +Clear() void
 }
-
 class BuoyStackHolderController {
     -List~BuoyStackHolder~ holders
     +IReadOnlyList~BuoyStackHolder~ Holders
     +BuoyStackHolderController()
     +InitHolders(BoardData board, IReadOnlyList~BuoyNodeData~ nodes, ColorDataSO colors, Transform boardRoot, BuoyStackHolderVisual holderPrefab, BuoyStackVisual stackPrefab, BuoyVisual buoyPrefab, InputSystem inputSystem) void
-    -CreateStack(BuoyStackHolder holder, Transform parent, BuoyColumnData source, int index, ColorDataSO colors, BuoyStackVisual stackPrefab, BuoyVisual buoyPrefab, InputSystem inputSystem) void$
+    -CreateStack(Transform parent, BuoyColumnData source, int index, ColorDataSO colors, BuoyStackVisual stackPrefab, BuoyVisual buoyPrefab, InputSystem inputSystem) BuoyStack$
     +Clear() void
 }
-
 class BuoyStackHolderVisual {
     -GameObject singleStackVisual
     -GameObject multipleStackVisual
@@ -151,12 +117,22 @@ class BuoyStackHolderVisual {
     -Vector3 firstStackOffset
     -Vector3 stackStep
     +SetOutletDirection(Vector2Int direction) void
-    +Refresh(int stackCount) void
+    -Collider receiveCollider
+    -float advanceDuration
+    -BuoyStackHolder owner
+    -Coroutine advanceTween
+    +Initialize(BuoyStackHolder holder, int visibleCapacity) void
+    ~ContainsGroup(ConveyorBuoyGroup group) bool
+    -OnTriggerEnter(Collider other) void
+    -OnTriggerStay(Collider other) void
+    -DetectGroup(Collider other) void
+    +TweenToFront(Transform stack, Action completed) void
+    -AdvanceStack(Transform stack, Action completed) IEnumerator
     +PlaceStack(Transform stack, int index) void
     -bool released
     +Release() void
 }
-
+MonoBehaviour <|-- BuoyStackHolderVisual
 class BuoyStackVisual {
     -Transform buoyRoot
     -Vector3 firstBuoyOffset
@@ -186,7 +162,53 @@ class BuoyStackVisual {
     -bool released
     +Release() void
 }
-
+MonoBehaviour <|-- BuoyStackVisual
+IInputReceiver <|.. BuoyStackVisual
+class BuoyTransferController {
+    -List~Transfer~ transfers
+    -List~ReceiveTransfer~ receives
+    -ConveyorController conveyor
+    -int generation
+    -float flightSpeed
+    -BuoyReceiveConfig receiveConfig
+    +SetReceiveConfig(BuoyReceiveConfig config) void
+    +BuoyTransferController(ConveyorController conveyor)
+    ~BeginReceive(BuoyStack stack, ConveyorBuoyGroup group, Action completed) void
+    +Begin(BuoyStack stack, Vector2Int outlet, BuoyStackHolder sourceHolder, Action completed) void
+    +Tick(float deltaTime, float speed, float interval) void
+    -LaunchReceiveFlights(ReceiveTransfer transfer) void$
+    -TickReceives(float deltaTime) void
+    +Clear() void
+}
+class Transfer {
+    +BuoyStack Stack
+    +List~Buoy~ Selected
+    +ConveyorBuoyGroup Group
+    +Action Completed
+    +List~Flight~ Flights
+    +int Next, Arrived
+    +float Timer, Elapsed, ExpectedArrival
+}
+class ReceiveTransfer {
+    +BuoyStack Stack
+    +ConveyorBuoyGroup Group
+    +Action Completed
+    +List~ReceiveFlight~ Flights
+    +int BaseIndex, Count, Next, Arrived
+    +float Elapsed, Duration, Delay
+}
+class ReceiveFlight {
+    +Buoy Buoy
+    +int Slot
+    +Vector3 StartPosition
+    +float LaunchTime
+    +bool Arrived
+}
+class Flight {
+    +Buoy Buoy
+    +int Slot
+    +bool Arrived
+}
 class BuoyVisual {
     -Renderer[] colorRenderers
     -BuoyColorConfig colorConfig
@@ -197,7 +219,7 @@ class BuoyVisual {
     -bool released
     +Release() void
 }
-
+MonoBehaviour <|-- BuoyVisual
 class ConveyorBuilder {
     -SplineComputer splineComputer
     -SplineMesh splineMesh
@@ -205,13 +227,18 @@ class ConveyorBuilder {
     +BuildConveyor(BoardData boardData, PathData pathData, Transform boardRoot) void
     -Validate(BoardData boardData, PathData pathData, Transform boardRoot) void
 }
-
 class ConveyorBuoyGroup {
     -List~Buoy~ buoys
     +IReadOnlyList~Buoy~ Buoys
     ~double Percent
     ~bool Moving
     ~bool IsLoaded
+    ~bool IsReceiving
+    ~BuoyStackHolder DepartureHolder
+    +float DetectionRadius
+    -SphereCollider detectionCollider
+    -Rigidbody body
+    -Update() void
     +HasColor(int colorCode) bool
     ~TakeTop() Buoy
     -float spacing
@@ -221,7 +248,7 @@ class ConveyorBuoyGroup {
     +Clear() void
     -OnDestroy() void
 }
-
+MonoBehaviour <|-- ConveyorBuoyGroup
 class ConveyorController {
     -SplineComputer splineComputer
     -SplineMesh splineMesh
@@ -241,8 +268,6 @@ class ConveyorController {
     -List~GroupPosition~ positions
     -float slotSpacing
     -float groupGap
-    -List~ReceiverPort~ receivers
-    +ConfigureReceivers(IReadOnlyList~BuoyStackHolder~ holders) void
     ~RemoveGroup(ConveyorBuoyGroup group) void
     +ConfigurePathSlots(float spacing, float minimumGap) void
     +RequestEntry(Vector2Int outletCell, float spacing, Func~Vector3_float~ estimateArrival, Action~ConveyorBuoyGroup~ accepted) void
@@ -257,68 +282,63 @@ class ConveyorController {
     -OnDestroy() void
     +InitConveyor(BoardData boardData, PathData pathData, Transform boardRoot) void
 }
-
+MonoBehaviour <|-- ConveyorController
 class PathMoveSlot {
     +float Distance
     +double Percent
 }
-
 class GroupPosition {
     +ConveyorBuoyGroup Group
     +float Distance, Step
-    +ReceiverPort Receiver
-    +float ReceiverTravel
 }
-
-class ReceiverPort {
-    +BuoyStackHolder Holder
-    +float Distance
-}
-
 class EnterRequest {
     +float Distance, Spacing
     +Func~Vector3_float~ EstimateArrival
     +Action~ConveyorBuoyGroup~ Accepted
 }
-
-class BuoyTransferController {
-    -List~Transfer~ transfers
-    -List~ReceiveTransfer~ receives
-    -ConveyorController conveyor
-    -int generation
-    -float flightSpeed
-    +BuoyTransferController(ConveyorController conveyor)
-    ~BeginReceive(BuoyStack stack, ConveyorBuoyGroup group, Action completed) void
-    +Begin(BuoyStack stack, Vector2Int outlet, Action completed) void
-    +Tick(float deltaTime, float speed, float interval) void
-    -TickReceives(float deltaTime, float speed, float interval) void
-    +Clear() void
+class IInputReceiver {
+    <<interface>>
+    +bool CanReceiveInput
+    +OnClick() void
 }
-
-class Transfer {
-    +BuoyStack Stack
-    +List~Buoy~ Selected
-    +ConveyorBuoyGroup Group
-    +Action Completed
-    +List~Flight~ Flights
-    +int Next, Arrived
-    +float Timer, Elapsed, ExpectedArrival
+class InputSystem {
+    -Camera inputCamera
+    -LayerMask raycastMask
+    -float maxDistance
+    -Dictionary~Collider_IInputReceiver~ receivers
+    -List~RaycastResult~ uiHits
+    +Register(Collider inputCollider, IInputReceiver receiver) void
+    +Unregister(Collider inputCollider, IInputReceiver receiver) void
+    -Update() void
+    -ProcessPress(Vector2 screenPosition, int pointerId) void
+    -IsOverUI(Vector2 screenPosition, int pointerId) bool
+    -OnDestroy() void
 }
-
-class ReceiveTransfer {
-    +BuoyStack Stack
-    +ConveyorBuoyGroup Group
-    +Action Completed
-    +Buoy InFlight
-    +float Timer
+MonoBehaviour <|-- InputSystem
+class LevelManager {
+    -LevelDataSO levelData
+    -BoardManager boardManager
+    -Transform boardRoot
+    -ConveyorController conveyorController
+    -InputSystem inputSystem
+    -BuoyVisual buoyPrefab
+    -BuoyStackVisual buoyStackPrefab
+    -BuoyStackHolderVisual buoyStackHolderPrefab
+    -SplineComputer splineComputer
+    -SplineMesh splineMesh
+    -float moveSpeed
+    -float rootYOffset
+    -float pathMoveSlotSpacing
+    -float conveyorGroupGap
+    -float transferSpeed
+    -float launchInterval
+    -BuoyReceiveConfig receiveConfig
+    -OnValidate() void
+    -ApplyMotionSettings() void
+    -Start() void
+    +InitLevel() void
 }
-
-class Flight {
-    +Buoy Buoy
-    +int Slot
-    +bool Arrived
-}
-
+MonoBehaviour <|-- LevelManager
 class LevelDataSO {
     -ColorDataSO colorData
     -BoardData board
@@ -329,7 +349,7 @@ class LevelDataSO {
     +PathData Path
     +IReadOnlyList~BuoyNodeData~ BuoyNodes
 }
-
+ScriptableObject <|-- LevelDataSO
 class BoardData {
     -int width
     -int height
@@ -338,14 +358,12 @@ class BoardData {
     +int Height
     +float CellSize
 }
-
 class PathData {
     -bool isClosed
     -List~Vector2Int~ cells
     +bool IsClosed
     +IReadOnlyList~Vector2Int~ Cells
 }
-
 class BuoyNodeData {
     -Vector2Int gridPosition
     -Vector2Int outletDirection
@@ -355,7 +373,6 @@ class BuoyNodeData {
     +Vector2Int OutletCell
     +IReadOnlyList~BuoyColumnData~ Columns
 }
-
 class BuoyColumnData {
     +int DefaultBuoyCount$
     -ColumnElementType columnType
@@ -369,7 +386,6 @@ class BuoyColumnData {
     +int BuoyCount
     -CreateDefaultBuoys() List~BuoyData~$
 }
-
 class BuoyData {
     -int colorCode
     -BuoyElementType buoyType
@@ -380,23 +396,20 @@ class BuoyData {
     +int BuoyTypeCount
     +IReadOnlyList~BuoyElementData~ Elements
 }
-
 class ColumnElementData {
     -string elementId
     +string ElementId
 }
-
 class BuoyElementData {
     -string elementId
     +string ElementId
 }
-
 class ColorDataSO {
     -List~ColorEntryData~ colors
     +IReadOnlyList~ColorEntryData~ Colors
     +TryGetColor(int code, out Color color) bool
 }
-
+ScriptableObject <|-- ColorDataSO
 class ColorEntryData {
     -int code
     -string displayName
@@ -405,7 +418,6 @@ class ColorEntryData {
     +string DisplayName
     +Color Color
 }
-
 class ColumnElementType {
     <<enumeration>>
     NormalPeg = 0
@@ -414,13 +426,11 @@ class ColumnElementType {
     IcePeg = 3
     ConveyorCounterBouyTxt = 4
 }
-
 class BuoyElementType {
     <<enumeration>>
     NormalBouy = 0
     Hidden = 1
 }
-
 class Outline {
     -HashSet~Mesh~ registeredMeshes$
     +Mode OutlineMode
@@ -450,7 +460,7 @@ class Outline {
     -CombineSubmeshes(Mesh mesh, Material[] materials) void
     +UpdateMaterialProperties() void
 }
-
+MonoBehaviour <|-- Outline
 class Mode {
     <<enumeration>>
     OutlineAll
@@ -459,42 +469,44 @@ class Mode {
     OutlineAndSilhouette
     SilhouetteOnly
 }
-
 class ListVector3 {
     +List~Vector3~ data
 }
-
 LevelManager --> LevelDataSO : reads
 LevelManager --> BoardManager : initializes
+LevelManager --> BuoyReceiveConfig : receive settings
+BoardManager --> BuoyReceiveConfig
+BuoyTransferController --> BuoyReceiveConfig : snapshot timing
 LevelManager --> ConveyorController : configures
-LevelManager --> InputSystem
 BoardManager *-- BuoyStackHolderController
-BoardManager *-- BuoyTransferController : ticks in LateUpdate
+BoardManager *-- BuoyTransferController : ticks flights
 BoardManager --> ConveyorController
-BuoyStackHolderController *-- BuoyStackHolder : creates
-BuoyStackHolderController ..> BuoyStackVisual : instantiates
-BuoyStackHolderController ..> BuoyVisual : instantiates
-BuoyStackHolder *-- BuoyStack : queue
+BuoyStackHolderController *-- BuoyStackHolder
+BuoyStackHolderController ..> BuoyStack : lazy factory
+BuoyStackHolder *-- BuoyStack : visible slots
+BuoyStackHolder o-- BuoyColumnData : pending queue
 BuoyStackHolder --> BuoyStackHolderVisual
+BuoyStackHolderVisual --> BuoyStackHolder : trigger detection
+BuoyStackHolderVisual ..> ConveyorBuoyGroup : collider lookup
 BuoyStackHolder --> BuoyTransferController
-BuoyStack *-- Buoy : stack contents
+BuoyStack *-- Buoy
 BuoyStack --> BuoyStackVisual
 Buoy --> BuoyVisual
 BuoyVisual --> BuoyColorConfig
 BuoyStackVisual ..|> IInputReceiver
-BuoyStackVisual --> InputSystem : registers collider
-InputSystem --> IInputReceiver : dispatches click
+BuoyStackVisual --> InputSystem
+InputSystem --> IInputReceiver : dispatches clicks
 ConveyorController *-- ConveyorBuilder
 ConveyorController *-- ConveyorBuoyGroup
-ConveyorController --> BuoyStackHolder : receiver ports
-ConveyorBuoyGroup o-- Buoy : current contents
 MonoBehaviour <|-- ConveyorBuoyGroup
-BuoyTransferController --> BuoyStack : removes or adds buoy
-BuoyTransferController --> ConveyorBuoyGroup : receives or takes buoy
-BuoyTransferController --> ConveyorController : reserves or removes group
+ConveyorBuoyGroup o-- Buoy : moving contents
+ConveyorBuoyGroup --> BuoyStackHolder : departure exclusion
+BuoyTransferController --> BuoyStack : landings
+BuoyTransferController --> ConveyorBuoyGroup : launch and claim
+BuoyTransferController --> ConveyorController : admission and removal
 ConveyorBuilder ..> BoardCoordinates
-BuoyStackHolderController ..> BoardCoordinates
 ConveyorController ..> BoardCoordinates
+BuoyStackHolderController ..> BoardCoordinates
 LevelDataSO *-- BoardData
 LevelDataSO *-- PathData
 LevelDataSO *-- BuoyNodeData
@@ -508,20 +520,8 @@ BuoyColorConfig *-- ColorMaterialEntry
 BuoyTransferController *-- Transfer
 BuoyTransferController *-- ReceiveTransfer
 Transfer *-- Flight
+ReceiveTransfer *-- ReceiveFlight
 ConveyorController *-- PathMoveSlot
 ConveyorController *-- GroupPosition
-ConveyorController *-- ReceiverPort
 ConveyorController *-- EnterRequest
 Outline *-- ListVector3
-MonoBehaviour <|-- BoardManager
-MonoBehaviour <|-- InputSystem
-MonoBehaviour <|-- LevelManager
-ScriptableObject <|-- BuoyColorConfig
-MonoBehaviour <|-- BuoyStackHolderVisual
-MonoBehaviour <|-- BuoyStackVisual
-IInputReceiver <|.. BuoyStackVisual
-MonoBehaviour <|-- BuoyVisual
-MonoBehaviour <|-- ConveyorController
-ScriptableObject <|-- LevelDataSO
-ScriptableObject <|-- ColorDataSO
-MonoBehaviour <|-- Outline

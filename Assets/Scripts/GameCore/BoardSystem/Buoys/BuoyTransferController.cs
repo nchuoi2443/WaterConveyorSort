@@ -12,13 +12,20 @@ namespace WaterConveyorSort.BoardSystem.Buoys
         private readonly ConveyorController conveyor;
         private int generation;
         private float flightSpeed = 4f;
+        private BuoyReceiveConfig receiveConfig;
+        public void SetReceiveConfig(BuoyReceiveConfig config) => receiveConfig = config;
         public BuoyTransferController(ConveyorController conveyor) { this.conveyor = conveyor; }
         internal void BeginReceive(BuoyStack stack, ConveyorBuoyGroup group, Action completed)
         {
-            group.Moving = false;
-            receives.Add(new ReceiveTransfer { Stack = stack, Group = group, Completed = completed });
+            group.IsReceiving = true;
+            var transfer = new ReceiveTransfer { Stack = stack, Group = group, Completed = completed,
+                BaseIndex = stack.Buoys.Count, Count = group.Buoys.Count,
+                Duration = receiveConfig != null ? receiveConfig.FlightDuration : 0.4f,
+                Delay = receiveConfig != null ? receiveConfig.LaunchDelay : 0.12f };
+            receives.Add(transfer);
+            LaunchReceiveFlights(transfer);
         }
-        public void Begin(BuoyStack stack, Vector2Int outlet, Action completed)
+        public void Begin(BuoyStack stack, Vector2Int outlet, BuoyStackHolder sourceHolder, Action completed)
         {
             List<Buoy> selected = stack.GetTopGroup();
             if (selected.Count == 0) { completed(); return; }
@@ -28,6 +35,7 @@ namespace WaterConveyorSort.BoardSystem.Buoys
                     Mathf.Max(flightSpeed, conveyor.MoveSpeed + 0.5f), group =>
             {
                 if (generation != requestGeneration) return;
+                group.DepartureHolder = sourceHolder;
                 transfers.Add(new Transfer { Stack = stack, Selected = selected, Group = group, Completed = completed,
                     ExpectedArrival = Vector3.Distance(selected[0].Visual.transform.position, group.GetSlotPosition(0)) /
                         Mathf.Max(flightSpeed, conveyor.MoveSpeed + 0.5f) });
@@ -73,28 +81,40 @@ namespace WaterConveyorSort.BoardSystem.Buoys
                 transfer.Group.IsLoaded = true;
                 transfer.Completed();
             }
-            TickReceives(deltaTime, speed, interval);
+            TickReceives(deltaTime);
         }
-        private void TickReceives(float deltaTime, float speed, float interval)
+        private static void LaunchReceiveFlights(ReceiveTransfer transfer)
+        {
+            // Use absolute launch times to preserve timing through slow frames and zero delay.
+            while (transfer.Next < transfer.Count && transfer.Next * transfer.Delay <= transfer.Elapsed)
+            {
+                Buoy buoy = transfer.Group.TakeTop();
+                transfer.Flights.Add(new ReceiveFlight { Buoy = buoy, Slot = transfer.Next,
+                    StartPosition = buoy.Visual.transform.position, LaunchTime = transfer.Next * transfer.Delay });
+                transfer.Next++;
+            }
+        }
+        private void TickReceives(float deltaTime)
         {
             for (int i = receives.Count - 1; i >= 0; i--)
             {
                 ReceiveTransfer transfer = receives[i];
-                transfer.Timer -= deltaTime;
-                // Land in order so each buoy targets the next free position on the stack.
-                if (transfer.InFlight == null && transfer.Group.Buoys.Count > 0 && transfer.Timer <= 0f)
+                transfer.Elapsed += Mathf.Max(0f, deltaTime);
+                LaunchReceiveFlights(transfer);
+                foreach (ReceiveFlight flight in transfer.Flights)
                 {
-                    transfer.InFlight = transfer.Group.TakeTop();
-                    transfer.Timer = Mathf.Max(0f, interval);
+                    if (flight.Arrived) continue;
+                    Vector3 target = transfer.Stack.Visual.GetBuoyPosition(transfer.BaseIndex + flight.Slot);
+                    float progress = Mathf.Clamp01((transfer.Elapsed - flight.LaunchTime) / transfer.Duration);
+                    flight.Buoy.Visual.transform.position = Vector3.Lerp(flight.StartPosition, target, progress);
+                    if (progress < 1f) continue;
+                    // Commit landings in launch order, even if a later flight catches up.
+                    if (flight.Slot != transfer.Arrived) continue;
+                    transfer.Stack.AddBuoy(flight.Buoy);
+                    flight.Arrived = true;
+                    transfer.Arrived++;
                 }
-                if (transfer.InFlight != null)
-                {
-                    Vector3 target = transfer.Stack.Visual.GetBuoyPosition(transfer.Stack.Buoys.Count);
-                    if (!transfer.InFlight.Visual.MoveTowards(target, Mathf.Max(0.01f, speed) * deltaTime)) continue;
-                    transfer.Stack.AddBuoy(transfer.InFlight);
-                    transfer.InFlight = null;
-                }
-                if (transfer.Group.Buoys.Count > 0) continue;
+                if (transfer.Arrived != transfer.Count) continue;
                 receives.RemoveAt(i);
                 conveyor.RemoveGroup(transfer.Group);
                 transfer.Completed();
@@ -104,7 +124,8 @@ namespace WaterConveyorSort.BoardSystem.Buoys
         {
             generation++;
             foreach (ReceiveTransfer transfer in receives)
-                transfer.InFlight?.Clear();
+                foreach (ReceiveFlight flight in transfer.Flights)
+                    if (!flight.Arrived) flight.Buoy.Clear();
             receives.Clear();
             foreach (Transfer transfer in transfers)
                 foreach (Flight flight in transfer.Flights)
@@ -126,8 +147,17 @@ namespace WaterConveyorSort.BoardSystem.Buoys
             public BuoyStack Stack;
             public ConveyorBuoyGroup Group;
             public Action Completed;
-            public Buoy InFlight;
-            public float Timer;
+            public readonly List<ReceiveFlight> Flights = new List<ReceiveFlight>();
+            public int BaseIndex, Count, Next, Arrived;
+            public float Elapsed, Duration, Delay;
+        }
+        private sealed class ReceiveFlight
+        {
+            public Buoy Buoy;
+            public int Slot;
+            public Vector3 StartPosition;
+            public float LaunchTime;
+            public bool Arrived;
         }
         private sealed class Flight
         {

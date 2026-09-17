@@ -21,6 +21,12 @@ namespace WaterConveyorSort.BoardSystem
 
         private float transferSpeed = 4f;
         private float launchInterval = 0.12f;
+        private BuoyReceiveConfig receiveConfig;
+        public void SetReceiveConfig(BuoyReceiveConfig config)
+        {
+            receiveConfig = config;
+            transfers?.SetReceiveConfig(config);
+        }
         public void Configure(Transform root, ConveyorController conveyor, InputSystem input,
             BuoyVisual buoy, BuoyStackVisual stack, BuoyStackHolderVisual holder)
         {
@@ -61,9 +67,9 @@ namespace WaterConveyorSort.BoardSystem
             buoyStackHolderController.InitHolders(boardData, nodes, colors, boardRoot,
                 buoyStackHolderPrefab, buoyStackPrefab, buoyPrefab, inputSystem);
             transfers = new BuoyTransferController(conveyorController);
+            transfers.SetReceiveConfig(receiveConfig);
             foreach (BuoyStackHolder holder in buoyStackHolderController.Holders)
                 holder.InitializeTransfers(transfers);
-            conveyorController.ConfigureReceivers(buoyStackHolderController.Holders);
         }
 
         private void OnDestroy()

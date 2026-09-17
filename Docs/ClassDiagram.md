@@ -1,10 +1,10 @@
 # Class diagram - current implementation
 
-Source snapshot: 2026-09-17. Scope: all Assets/Scripts/GameCore types, related level data, palette and enum types, and QuickOutline. Unity/Dreamteck internals and editor tooling are external. This documents existing code; fixed holder visuals, queue tweening and transfers from a moving group are not implemented yet.
+Scope: GameCore, related level data and QuickOutline. Generated from the C# source declarations. Unity and Dreamteck internals are external.
 
 ## Legend
 
-`+` public, `-` private (including implicit private), `~` internal, `#` protected, `$` static/const. Fields and properties have no parentheses; C# declarations below retain attributes and property accessors. `*--` lifecycle ownership, `o--` transferable contents, `-->` reference, `..>` dependency, `<|--` inheritance, `<|..` interface implementation. Mermaid generics use `~Type~`; multi-argument generics use `_`. The C# listings are declaration summaries, not compilable class bodies.
+`+` public, `-` private, `~` internal, `#` protected, `$` static/const. Properties have no parentheses. Attribute and accessor summaries appear in the C# listings. Multi-argument Mermaid generics use `_`; the C# listings retain exact generic types. Class bodies and method bodies are omitted. Nested types use short names.
 
 ## Overview relationships
 
@@ -13,35 +13,39 @@ classDiagram
 direction LR
 LevelManager --> LevelDataSO : reads
 LevelManager --> BoardManager : initializes
+LevelManager --> BuoyReceiveConfig : receive settings
+BoardManager --> BuoyReceiveConfig
+BuoyTransferController --> BuoyReceiveConfig : snapshot timing
 LevelManager --> ConveyorController : configures
-LevelManager --> InputSystem
 BoardManager *-- BuoyStackHolderController
-BoardManager *-- BuoyTransferController : ticks in LateUpdate
+BoardManager *-- BuoyTransferController : ticks flights
 BoardManager --> ConveyorController
-BuoyStackHolderController *-- BuoyStackHolder : creates
-BuoyStackHolderController ..> BuoyStackVisual : instantiates
-BuoyStackHolderController ..> BuoyVisual : instantiates
-BuoyStackHolder *-- BuoyStack : queue
+BuoyStackHolderController *-- BuoyStackHolder
+BuoyStackHolderController ..> BuoyStack : lazy factory
+BuoyStackHolder *-- BuoyStack : visible slots
+BuoyStackHolder o-- BuoyColumnData : pending queue
 BuoyStackHolder --> BuoyStackHolderVisual
+BuoyStackHolderVisual --> BuoyStackHolder : trigger detection
+BuoyStackHolderVisual ..> ConveyorBuoyGroup : collider lookup
 BuoyStackHolder --> BuoyTransferController
-BuoyStack *-- Buoy : stack contents
+BuoyStack *-- Buoy
 BuoyStack --> BuoyStackVisual
 Buoy --> BuoyVisual
 BuoyVisual --> BuoyColorConfig
 BuoyStackVisual ..|> IInputReceiver
-BuoyStackVisual --> InputSystem : registers collider
-InputSystem --> IInputReceiver : dispatches click
+BuoyStackVisual --> InputSystem
+InputSystem --> IInputReceiver : dispatches clicks
 ConveyorController *-- ConveyorBuilder
 ConveyorController *-- ConveyorBuoyGroup
-ConveyorController --> BuoyStackHolder : receiver ports
-ConveyorBuoyGroup o-- Buoy : current contents
 MonoBehaviour <|-- ConveyorBuoyGroup
-BuoyTransferController --> BuoyStack : removes or adds buoy
-BuoyTransferController --> ConveyorBuoyGroup : receives or takes buoy
-BuoyTransferController --> ConveyorController : reserves or removes group
+ConveyorBuoyGroup o-- Buoy : moving contents
+ConveyorBuoyGroup --> BuoyStackHolder : departure exclusion
+BuoyTransferController --> BuoyStack : landings
+BuoyTransferController --> ConveyorBuoyGroup : launch and claim
+BuoyTransferController --> ConveyorController : admission and removal
 ConveyorBuilder ..> BoardCoordinates
-BuoyStackHolderController ..> BoardCoordinates
 ConveyorController ..> BoardCoordinates
+BuoyStackHolderController ..> BoardCoordinates
 LevelDataSO *-- BoardData
 LevelDataSO *-- PathData
 LevelDataSO *-- BuoyNodeData
@@ -55,9 +59,9 @@ BuoyColorConfig *-- ColorMaterialEntry
 BuoyTransferController *-- Transfer
 BuoyTransferController *-- ReceiveTransfer
 Transfer *-- Flight
+ReceiveTransfer *-- ReceiveFlight
 ConveyorController *-- PathMoveSlot
 ConveyorController *-- GroupPosition
-ConveyorController *-- ReceiverPort
 ConveyorController *-- EnterRequest
 Outline *-- ListVector3
 ```
@@ -79,6 +83,8 @@ class BoardManager {
     -InputSystem inputSystem
     -float transferSpeed
     -float launchInterval
+    -BuoyReceiveConfig receiveConfig
+    +SetReceiveConfig(BuoyReceiveConfig config) void
     +Configure(Transform root, ConveyorController conveyor, InputSystem input, BuoyVisual buoy, BuoyStackVisual stack, BuoyStackHolderVisual holder) void
     +SetMotionSettings(float speed, float interval) void
     -BuoyTransferController transfers
@@ -124,17 +130,18 @@ class LevelManager {
     -float conveyorGroupGap
     -float transferSpeed
     -float launchInterval
+    -BuoyReceiveConfig receiveConfig
     -OnValidate() void
     -ApplyMotionSettings() void
     -Start() void
     +InitLevel() void
 }
 MonoBehaviour <|-- LevelManager
+LevelManager --> BoardManager : initializes
+InputSystem --> IInputReceiver : dispatches clicks
 ```
 
-### C# declarations and attributes
-
-#### BoardCoordinates
+### BoardCoordinates
 
 Source: [Assets/Scripts/GameCore/BoardSystem/BoardCoordinates.cs](../Assets/Scripts/GameCore/BoardSystem/BoardCoordinates.cs).
 
@@ -142,51 +149,53 @@ Source: [Assets/Scripts/GameCore/BoardSystem/BoardCoordinates.cs](../Assets/Scri
 public static Vector3 CellToLocal(BoardData board, Vector2Int cell)
 ```
 
-#### BoardManager
+### BoardManager
 
 Source: [Assets/Scripts/GameCore/BoardSystem/BoardManager.cs](../Assets/Scripts/GameCore/BoardSystem/BoardManager.cs).
 
 ```csharp
 [Tooltip("Board center and orientation. Keep its world scale at one for CellSize in world units.")]
-private Transform boardRoot
-private ConveyorController conveyorController
-private BuoyVisual buoyPrefab
-private BuoyStackVisual buoyStackPrefab
-private BuoyStackHolderVisual buoyStackHolderPrefab
-private InputSystem inputSystem
-private float transferSpeed = 4f
-private float launchInterval = 0.12f
+private Transform boardRoot;
+private ConveyorController conveyorController;
+private BuoyVisual buoyPrefab;
+private BuoyStackVisual buoyStackPrefab;
+private BuoyStackHolderVisual buoyStackHolderPrefab;
+private InputSystem inputSystem;
+private float transferSpeed = 4f;
+private float launchInterval = 0.12f;
+private BuoyReceiveConfig receiveConfig;
+public void SetReceiveConfig(BuoyReceiveConfig config)
 public void Configure(Transform root, ConveyorController conveyor, InputSystem input, BuoyVisual buoy, BuoyStackVisual stack, BuoyStackHolderVisual holder)
 public void SetMotionSettings(float speed, float interval)
-private BuoyTransferController transfers
+private BuoyTransferController transfers;
 private void LateUpdate()
-private readonly BuoyStackHolderController buoyStackHolderController = new BuoyStackHolderController()
+private readonly BuoyStackHolderController buoyStackHolderController = new BuoyStackHolderController();
 public void InitBoard(BoardData boardData, PathData pathData, IReadOnlyList<BuoyNodeData> nodes, ColorDataSO colors)
 private void OnDestroy()
 ```
 
-#### IInputReceiver
+### IInputReceiver
 
 Source: [Assets/Scripts/GameCore/InputSystem/IInputReceiver.cs](../Assets/Scripts/GameCore/InputSystem/IInputReceiver.cs).
 
 ```csharp
 bool CanReceiveInput { get; }
-void OnClick()
+void OnClick();
 ```
 
-#### InputSystem
+### InputSystem
 
 Source: [Assets/Scripts/GameCore/InputSystem/InputSystem.cs](../Assets/Scripts/GameCore/InputSystem/InputSystem.cs).
 
 ```csharp
 [SerializeField]
-private Camera inputCamera
+private Camera inputCamera;
 [SerializeField]
-private LayerMask raycastMask = Physics.DefaultRaycastLayers
+private LayerMask raycastMask = Physics.DefaultRaycastLayers;
 [SerializeField, Min(0.01f)]
-private float maxDistance = 1000f
-private readonly Dictionary<Collider, IInputReceiver> receivers = new Dictionary<Collider, IInputReceiver>()
-private readonly List<RaycastResult> uiHits = new List<RaycastResult>()
+private float maxDistance = 1000f;
+private readonly Dictionary<Collider, IInputReceiver> receivers = new Dictionary<Collider, IInputReceiver>();
+private readonly List<RaycastResult> uiHits = new List<RaycastResult>();
 public void Register(Collider inputCollider, IInputReceiver receiver)
 public void Unregister(Collider inputCollider, IInputReceiver receiver)
 private void Update()
@@ -195,43 +204,45 @@ private bool IsOverUI(Vector2 screenPosition, int pointerId)
 private void OnDestroy()
 ```
 
-#### LevelManager
+### LevelManager
 
 Source: [Assets/Scripts/GameCore/LevelSystem/LevelManager.cs](../Assets/Scripts/GameCore/LevelSystem/LevelManager.cs).
 
 ```csharp
 [SerializeField]
-private LevelDataSO levelData
+private LevelDataSO levelData;
 [SerializeField]
-private BoardManager boardManager
+private BoardManager boardManager;
 [Header("Board Setup")] [SerializeField]
-private Transform boardRoot
+private Transform boardRoot;
 [SerializeField]
-private ConveyorController conveyorController
+private ConveyorController conveyorController;
 [SerializeField]
-private InputSystem inputSystem
+private InputSystem inputSystem;
 [SerializeField]
-private BuoyVisual buoyPrefab
+private BuoyVisual buoyPrefab;
 [SerializeField]
-private BuoyStackVisual buoyStackPrefab
+private BuoyStackVisual buoyStackPrefab;
 [SerializeField]
-private BuoyStackHolderVisual buoyStackHolderPrefab
+private BuoyStackHolderVisual buoyStackHolderPrefab;
 [Header("Conveyor Setup")] [SerializeField]
-private SplineComputer splineComputer
+private SplineComputer splineComputer;
 [SerializeField]
-private SplineMesh splineMesh
+private SplineMesh splineMesh;
 [SerializeField, Min(0f)]
-private float moveSpeed = 1f
+private float moveSpeed = 1f;
 [Tooltip("Group root height above the spline, along the board's local up axis, in world units.")] [SerializeField]
-private float rootYOffset = 0.2f
+private float rootYOffset = 0.2f;
 [SerializeField, Min(0.01f)]
-private float pathMoveSlotSpacing = 0.3f
+private float pathMoveSlotSpacing = 0.3f;
 [SerializeField, Min(0.01f)]
-private float conveyorGroupGap = 0.6f
+private float conveyorGroupGap = 0.6f;
 [Header("Transfer Setup")] [SerializeField, Min(0.01f)]
-private float transferSpeed = 4f
+private float transferSpeed = 4f;
 [SerializeField, Min(0f)]
-private float launchInterval = 0.12f
+private float launchInterval = 0.12f;
+[Header("Conveyor To Stack")] [SerializeField]
+private BuoyReceiveConfig receiveConfig;
 private void OnValidate()
 private void ApplyMotionSettings()
 private void Start()
@@ -291,21 +302,28 @@ class BuoyStack {
 class BuoyStackHolder {
     -BuoyStackHolderVisual visual
     -List~BuoyStack~ stacks
+    -Queue~BuoyColumnData~ pending
+    -Func~BuoyColumnData_BuoyStack~ createStack
+    -BuoyTransferController transfer
+    -bool busy
+    -bool cleared
     +IReadOnlyList~BuoyStack~ Stacks
     +BuoyStack ActiveStack
+    +int VisibleCapacity
     +Vector2Int GridPosition
     +Vector2Int OutletDirection
     +Vector2Int OutletCell
     +BuoyStackHolder(BuoyNodeData source, BuoyStackHolderVisual visual)
-    ~AddStack(BuoyStack stack, BuoyStackVisual stackVisual) void
-    -BuoyTransferController transfer
-    -bool busy
+    ~InitializeStacks(Func~BuoyColumnData_BuoyStack~ factory) void
+    -FillVisibleStacks() void
+    ~ContainsGroup(ConveyorBuoyGroup group) bool
     ~CanReceive(ConveyorBuoyGroup group) bool
     ~TryReceive(ConveyorBuoyGroup group) bool
     +InitializeTransfers(BuoyTransferController controller) void
     -OnStackClicked(BuoyStack stack) void
     -FinishTransfer() void
-    -AdvanceQueue() void
+    -FinishQueueAdvance() void
+    -RefreshInput() void
     +Clear() void
 }
 class BuoyStackHolderController {
@@ -313,7 +331,7 @@ class BuoyStackHolderController {
     +IReadOnlyList~BuoyStackHolder~ Holders
     +BuoyStackHolderController()
     +InitHolders(BoardData board, IReadOnlyList~BuoyNodeData~ nodes, ColorDataSO colors, Transform boardRoot, BuoyStackHolderVisual holderPrefab, BuoyStackVisual stackPrefab, BuoyVisual buoyPrefab, InputSystem inputSystem) void
-    -CreateStack(BuoyStackHolder holder, Transform parent, BuoyColumnData source, int index, ColorDataSO colors, BuoyStackVisual stackPrefab, BuoyVisual buoyPrefab, InputSystem inputSystem) void$
+    -CreateStack(Transform parent, BuoyColumnData source, int index, ColorDataSO colors, BuoyStackVisual stackPrefab, BuoyVisual buoyPrefab, InputSystem inputSystem) BuoyStack$
     +Clear() void
 }
 class BuoyStackHolderVisual {
@@ -323,7 +341,17 @@ class BuoyStackHolderVisual {
     -Vector3 firstStackOffset
     -Vector3 stackStep
     +SetOutletDirection(Vector2Int direction) void
-    +Refresh(int stackCount) void
+    -Collider receiveCollider
+    -float advanceDuration
+    -BuoyStackHolder owner
+    -Coroutine advanceTween
+    +Initialize(BuoyStackHolder holder, int visibleCapacity) void
+    ~ContainsGroup(ConveyorBuoyGroup group) bool
+    -OnTriggerEnter(Collider other) void
+    -OnTriggerStay(Collider other) void
+    -DetectGroup(Collider other) void
+    +TweenToFront(Transform stack, Action completed) void
+    -AdvanceStack(Transform stack, Action completed) IEnumerator
     +PlaceStack(Transform stack, int index) void
     -bool released
     +Release() void
@@ -371,67 +399,75 @@ class BuoyVisual {
     +Release() void
 }
 MonoBehaviour <|-- BuoyVisual
+BuoyStackHolderController *-- BuoyStackHolder
+BuoyStackHolderController ..> BuoyStack : lazy factory
+BuoyStackHolder *-- BuoyStack : visible slots
+BuoyStackHolder --> BuoyStackHolderVisual
+BuoyStackHolderVisual --> BuoyStackHolder : trigger detection
+BuoyStack *-- Buoy
+BuoyStack --> BuoyStackVisual
+Buoy --> BuoyVisual
+BuoyVisual --> BuoyColorConfig
+BuoyColorConfig *-- ColorMaterialEntry
 ```
 
-### C# declarations and attributes
-
-#### Buoy
+### Buoy
 
 Source: [Assets/Scripts/GameCore/BoardSystem/Buoys/Buoy.cs](../Assets/Scripts/GameCore/BoardSystem/Buoys/Buoy.cs).
 
 ```csharp
-private readonly BuoyVisual visual
+private readonly BuoyVisual visual;
 public int ColorCode { get; }
 public BuoyElementType Type { get; }
 public int TypeCount { get; }
 public IReadOnlyList<string> Elements { get; }
 internal BuoyVisual Visual => visual;
-private bool cleared
+private bool cleared;
 public Buoy(BuoyData source, ColorDataSO colors, BuoyVisual visual)
 public void Clear()
 ```
 
-#### BuoyColorConfig
+### BuoyColorConfig
 
 Source: [Assets/Scripts/GameCore/BoardSystem/Buoys/BuoyColorConfig.cs](../Assets/Scripts/GameCore/BoardSystem/Buoys/BuoyColorConfig.cs).
 
 ```csharp
 [SerializeField]
-private List<ColorMaterialEntry> colors = new List<ColorMaterialEntry>()
-private Dictionary<int, Material> materials
+private List<ColorMaterialEntry> colors = new List<ColorMaterialEntry>();
+private Dictionary<int, Material> materials;
 public Material GetMaterial(int colorId)
 private void OnEnable()
 private void OnValidate()
 private void BuildLookup()
 ```
 
-#### ColorMaterialEntry
+### ColorMaterialEntry
 
 Source: [Assets/Scripts/GameCore/BoardSystem/Buoys/BuoyColorConfig.cs](../Assets/Scripts/GameCore/BoardSystem/Buoys/BuoyColorConfig.cs).
 
 ```csharp
 [SerializeField]
-private int colorId
+private int colorId;
 [SerializeField]
-private Material material
+private Material material;
 public int ColorId => colorId;
 public Material Material => material;
 ```
 
-#### BuoyStack
+### BuoyStack
 
 Source: [Assets/Scripts/GameCore/BoardSystem/Buoys/BuoyStack.cs](../Assets/Scripts/GameCore/BoardSystem/Buoys/BuoyStack.cs).
 
 ```csharp
-private readonly BuoyStackVisual visual
-private readonly List<Buoy> buoys = new List<Buoy>()
-private bool cleared
+private readonly BuoyStackVisual visual;
+private readonly List<Buoy> buoys = new List<Buoy>();
+private bool cleared;
 internal BuoyStackVisual Visual => visual;
-private bool canReceiveInput
-public bool CanReceiveInput
+private bool canReceiveInput;
+public bool CanReceiveInput { get; set; }
 public List<Buoy> GetTopGroup()
 internal void RemoveTop(Buoy buoy)
-public event Action<BuoyStack> Clicked
+public event Action<BuoyStack> Clicked;
 public IReadOnlyList<Buoy> Buoys { get; }
 public ColumnElementType Type { get; }
 public int TypeCount { get; }
@@ -442,93 +478,112 @@ public void OnClick()
 public void Clear()
 ```
 
-#### BuoyStackHolder
+### BuoyStackHolder
 
 Source: [Assets/Scripts/GameCore/BoardSystem/Buoys/BuoyStackHolder.cs](../Assets/Scripts/GameCore/BoardSystem/Buoys/BuoyStackHolder.cs).
 
 ```csharp
-private readonly BuoyStackHolderVisual visual
-private readonly List<BuoyStack> stacks = new List<BuoyStack>()
+private readonly BuoyStackHolderVisual visual;
+private readonly List<BuoyStack> stacks = new List<BuoyStack>();
+private readonly Queue<BuoyColumnData> pending = new Queue<BuoyColumnData>();
+private Func<BuoyColumnData, BuoyStack> createStack;
+private BuoyTransferController transfer;
+private bool busy;
+private bool cleared;
 public IReadOnlyList<BuoyStack> Stacks { get; }
 public BuoyStack ActiveStack => stacks.Count > 0 ? stacks[0] : null;
+public int VisibleCapacity { get; }
 public Vector2Int GridPosition { get; }
 public Vector2Int OutletDirection { get; }
 public Vector2Int OutletCell => GridPosition + OutletDirection;
 public BuoyStackHolder(BuoyNodeData source, BuoyStackHolderVisual visual)
-internal void AddStack(BuoyStack stack, BuoyStackVisual stackVisual)
-private BuoyTransferController transfer
-private bool busy
+internal void InitializeStacks(Func<BuoyColumnData, BuoyStack> factory)
+private void FillVisibleStacks()
+internal bool ContainsGroup(ConveyorBuoyGroup group)
 internal bool CanReceive(ConveyorBuoyGroup group)
 internal bool TryReceive(ConveyorBuoyGroup group)
 public void InitializeTransfers(BuoyTransferController controller)
 private void OnStackClicked(BuoyStack stack)
 private void FinishTransfer()
-private void AdvanceQueue()
+private void FinishQueueAdvance()
+private void RefreshInput()
 public void Clear()
 ```
 
-#### BuoyStackHolderController
+### BuoyStackHolderController
 
 Source: [Assets/Scripts/GameCore/BoardSystem/Buoys/BuoyStackHolderController.cs](../Assets/Scripts/GameCore/BoardSystem/Buoys/BuoyStackHolderController.cs).
 
 ```csharp
-private readonly List<BuoyStackHolder> holders = new List<BuoyStackHolder>()
+private readonly List<BuoyStackHolder> holders = new List<BuoyStackHolder>();
 public IReadOnlyList<BuoyStackHolder> Holders { get; }
 public BuoyStackHolderController()
 public void InitHolders(BoardData board, IReadOnlyList<BuoyNodeData> nodes, ColorDataSO colors, Transform boardRoot, BuoyStackHolderVisual holderPrefab, BuoyStackVisual stackPrefab, BuoyVisual buoyPrefab, InputSystem inputSystem)
-private static void CreateStack(BuoyStackHolder holder, Transform parent, BuoyColumnData source, int index, ColorDataSO colors, BuoyStackVisual stackPrefab, BuoyVisual buoyPrefab, InputSystem inputSystem)
+private static BuoyStack CreateStack(Transform parent, BuoyColumnData source, int index, ColorDataSO colors, BuoyStackVisual stackPrefab, BuoyVisual buoyPrefab, InputSystem inputSystem)
 public void Clear()
 ```
 
-#### BuoyStackHolderVisual
+### BuoyStackHolderVisual
 
 Source: [Assets/Scripts/GameCore/BoardSystem/Buoys/BuoyStackHolderVisual.cs](../Assets/Scripts/GameCore/BoardSystem/Buoys/BuoyStackHolderVisual.cs).
 
 ```csharp
 [Tooltip("Optional decorative objects, separate from the stack root.")] [SerializeField]
-private GameObject singleStackVisual
+private GameObject singleStackVisual;
 [SerializeField]
-private GameObject multipleStackVisual
+private GameObject multipleStackVisual;
 [SerializeField]
-private Transform stackRoot
+private Transform stackRoot;
 [SerializeField]
-private Vector3 firstStackOffset
+private Vector3 firstStackOffset;
 [SerializeField]
-private Vector3 stackStep = new Vector3(0f, 0f, -0.8f)
+private Vector3 stackStep = new Vector3(0f, 0f, -0.8f);
 public void SetOutletDirection(Vector2Int direction)
-public void Refresh(int stackCount)
+[SerializeField]
+private Collider receiveCollider;
+[SerializeField, Min(0f)]
+private float advanceDuration = 0.3f;
+private BuoyStackHolder owner;
+private Coroutine advanceTween;
+public void Initialize(BuoyStackHolder holder, int visibleCapacity)
+internal bool ContainsGroup(ConveyorBuoyGroup group)
+private void OnTriggerEnter(Collider other)
+private void OnTriggerStay(Collider other)
+private void DetectGroup(Collider other)
+public void TweenToFront(Transform stack, Action completed)
+private IEnumerator AdvanceStack(Transform stack, Action completed)
 public void PlaceStack(Transform stack, int index)
-private bool released
+private bool released;
 public void Release()
 ```
 
-#### BuoyStackVisual
+### BuoyStackVisual
 
 Source: [Assets/Scripts/GameCore/BoardSystem/Buoys/BuoyStackVisual.cs](../Assets/Scripts/GameCore/BoardSystem/Buoys/BuoyStackVisual.cs).
 
 ```csharp
 [SerializeField]
-private Transform buoyRoot
+private Transform buoyRoot;
 [SerializeField]
-private Vector3 firstBuoyOffset = new Vector3(0f, 0.2f, 0f)
+private Vector3 firstBuoyOffset = new Vector3(0f, 0.2f, 0f);
 [SerializeField, Min(0f)]
-private float buoySpacing = 0f
+private float buoySpacing = 0f;
 [SerializeField, Min(0.01f)]
-private float buoyHeight = 0.2f
+private float buoyHeight = 0.2f;
 [SerializeField]
-private Transform poleTransform
+private Transform poleTransform;
 public float Step => buoyHeight + buoySpacing;
-private Vector3 poleScale, polePosition
-private Bounds poleBounds
-private bool poleCached
-private bool inputEnabled
-private int count
+private Vector3 poleScale, polePosition;
+private Bounds poleBounds;
+private bool poleCached;
+private bool inputEnabled;
+private int count;
 public void SetInputEnabled(bool enabled)
 public void RefreshHeight(int buoyCount)
 [SerializeField]
-private Collider[] inputColliders
-private InputSystem inputSystem
-private BuoyStack owner
+private Collider[] inputColliders;
+private InputSystem inputSystem;
+private BuoyStack owner;
 public bool CanReceiveInput => !released && isActiveAndEnabled && owner != null && owner.CanReceiveInput;
 public void BindInput(BuoyStack stack, InputSystem system)
 public void OnClick()
@@ -538,24 +593,24 @@ private void RegisterInput()
 private void UnregisterInput()
 public Vector3 GetBuoyPosition(int index)
 public void PlaceBuoy(Transform buoy, int index)
-private bool released
+private bool released;
 public void Release()
 ```
 
-#### BuoyVisual
+### BuoyVisual
 
 Source: [Assets/Scripts/GameCore/BoardSystem/Buoys/BuoyVisual.cs](../Assets/Scripts/GameCore/BoardSystem/Buoys/BuoyVisual.cs).
 
 ```csharp
 [Tooltip("Only renderers which should receive the buoy color.")] [SerializeField]
-private Renderer[] colorRenderers
+private Renderer[] colorRenderers;
 [SerializeField]
-private BuoyColorConfig colorConfig
-private MaterialPropertyBlock propertyBlock
-private static readonly int BaseColor = Shader.PropertyToID("_Color")
+private BuoyColorConfig colorConfig;
+private MaterialPropertyBlock propertyBlock;
+private static readonly int BaseColor = Shader.PropertyToID("_Color");
 public void Refresh(int colorId, Color color)
 public bool MoveTowards(Vector3 target, float distance)
-private bool released
+private bool released;
 public void Release()
 ```
 
@@ -577,6 +632,12 @@ class ConveyorBuoyGroup {
     ~double Percent
     ~bool Moving
     ~bool IsLoaded
+    ~bool IsReceiving
+    ~BuoyStackHolder DepartureHolder
+    +float DetectionRadius
+    -SphereCollider detectionCollider
+    -Rigidbody body
+    -Update() void
     +HasColor(int colorCode) bool
     ~TakeTop() Buoy
     -float spacing
@@ -606,8 +667,6 @@ class ConveyorController {
     -List~GroupPosition~ positions
     -float slotSpacing
     -float groupGap
-    -List~ReceiverPort~ receivers
-    +ConfigureReceivers(IReadOnlyList~BuoyStackHolder~ holders) void
     ~RemoveGroup(ConveyorBuoyGroup group) void
     +ConfigurePathSlots(float spacing, float minimumGap) void
     +RequestEntry(Vector2Int outletCell, float spacing, Func~Vector3_float~ estimateArrival, Action~ConveyorBuoyGroup~ accepted) void
@@ -630,47 +689,50 @@ class PathMoveSlot {
 class GroupPosition {
     +ConveyorBuoyGroup Group
     +float Distance, Step
-    +ReceiverPort Receiver
-    +float ReceiverTravel
-}
-class ReceiverPort {
-    +BuoyStackHolder Holder
-    +float Distance
 }
 class EnterRequest {
     +float Distance, Spacing
     +Func~Vector3_float~ EstimateArrival
     +Action~ConveyorBuoyGroup~ Accepted
 }
+ConveyorController *-- ConveyorBuilder
+ConveyorController *-- ConveyorBuoyGroup
+ConveyorController *-- PathMoveSlot
+ConveyorController *-- GroupPosition
+ConveyorController *-- EnterRequest
 ```
 
-### C# declarations and attributes
-
-#### ConveyorBuilder
+### ConveyorBuilder
 
 Source: [Assets/Scripts/GameCore/BoardSystem/Conveyor/ConveyorBuilder.cs](../Assets/Scripts/GameCore/BoardSystem/Conveyor/ConveyorBuilder.cs).
 
 ```csharp
-private readonly SplineComputer splineComputer
-private readonly SplineMesh splineMesh
+private readonly SplineComputer splineComputer;
+private readonly SplineMesh splineMesh;
 public ConveyorBuilder(SplineComputer splineComputer, SplineMesh splineMesh)
 public void BuildConveyor(BoardData boardData, PathData pathData, Transform boardRoot)
 private void Validate(BoardData boardData, PathData pathData, Transform boardRoot)
 ```
 
-#### ConveyorBuoyGroup
+### ConveyorBuoyGroup
 
 Source: [Assets/Scripts/GameCore/BoardSystem/Conveyor/ConveyorBuoyGroup.cs](../Assets/Scripts/GameCore/BoardSystem/Conveyor/ConveyorBuoyGroup.cs).
 
 ```csharp
-private readonly List<Buoy> buoys = new List<Buoy>()
+private readonly List<Buoy> buoys = new List<Buoy>();
 public IReadOnlyList<Buoy> Buoys => buoys;
-internal double Percent
-internal bool Moving
+internal double Percent;
+internal bool Moving;
 internal bool IsLoaded { get; set; }
+internal bool IsReceiving { get; set; }
+internal BuoyStackHolder DepartureHolder { get; set; }
+public float DetectionRadius => detectionCollider != null ? detectionCollider.radius * Mathf.Max(Mathf.Abs(transform.lossyScale.x), Mathf.Abs(transform.lossyScale.y), Mathf.Abs(transform.lossyScale.z)) : 0f;
+private SphereCollider detectionCollider;
+private Rigidbody body;
+private void Update()
 public bool HasColor(int colorCode)
 internal Buoy TakeTop()
-private float spacing
+private float spacing;
 public void Initialize(double percent, float spacing)
 public Vector3 GetSlotPosition(int slot)
 public void Receive(Buoy buoy, int slot)
@@ -678,31 +740,29 @@ public void Clear()
 private void OnDestroy()
 ```
 
-#### ConveyorController
+### ConveyorController
 
 Source: [Assets/Scripts/GameCore/BoardSystem/Conveyor/ConveyorController.cs](../Assets/Scripts/GameCore/BoardSystem/Conveyor/ConveyorController.cs).
 
 ```csharp
-private SplineComputer splineComputer
-private SplineMesh splineMesh
-private float moveSpeed = 1f
-private float rootYOffset = 0.2f
+private SplineComputer splineComputer;
+private SplineMesh splineMesh;
+private float moveSpeed = 1f;
+private float rootYOffset = 0.2f;
 public void Configure(SplineComputer computer, SplineMesh mesh)
 public void SetMotionSettings(float speed, float yOffset)
 public float MoveSpeed => Mathf.Max(0f, moveSpeed);
-private readonly List<ConveyorBuoyGroup> groups = new List<ConveyorBuoyGroup>()
-private BoardData board
-private Transform root
-private bool closed
-private float length
-private ConveyorBuilder conveyorBuilder
-private readonly List<PathMoveSlot> _pathMoveSlots = new List<PathMoveSlot>()
-private readonly List<EnterRequest> waiting = new List<EnterRequest>()
-private readonly List<GroupPosition> positions = new List<GroupPosition>()
-private float slotSpacing = 0.3f
-private float groupGap = 0.6f
-private readonly List<ReceiverPort> receivers = new List<ReceiverPort>()
-public void ConfigureReceivers(IReadOnlyList<BuoyStackHolder> holders)
+private readonly List<ConveyorBuoyGroup> groups = new List<ConveyorBuoyGroup>();
+private BoardData board;
+private Transform root;
+private bool closed;
+private float length;
+private ConveyorBuilder conveyorBuilder;
+private readonly List<PathMoveSlot> _pathMoveSlots = new List<PathMoveSlot>();
+private readonly List<EnterRequest> waiting = new List<EnterRequest>();
+private readonly List<GroupPosition> positions = new List<GroupPosition>();
+private float slotSpacing = 0.3f;
+private float groupGap = 0.6f;
 internal void RemoveGroup(ConveyorBuoyGroup group)
 public void ConfigurePathSlots(float spacing, float minimumGap)
 public void RequestEntry(Vector2Int outletCell, float spacing, Func<Vector3, float> estimateArrival, Action<ConveyorBuoyGroup> accepted)
@@ -718,61 +778,60 @@ private void OnDestroy()
 public void InitConveyor(BoardData boardData, PathData pathData, Transform boardRoot)
 ```
 
-#### PathMoveSlot
+### PathMoveSlot
 
 Source: [Assets/Scripts/GameCore/BoardSystem/Conveyor/ConveyorController.cs](../Assets/Scripts/GameCore/BoardSystem/Conveyor/ConveyorController.cs).
 
 ```csharp
-public float Distance
-public double Percent
+public float Distance;
+public double Percent;
 ```
 
-#### GroupPosition
+### GroupPosition
 
 Source: [Assets/Scripts/GameCore/BoardSystem/Conveyor/ConveyorController.cs](../Assets/Scripts/GameCore/BoardSystem/Conveyor/ConveyorController.cs).
 
 ```csharp
-public ConveyorBuoyGroup Group
-public float Distance, Step
-public ReceiverPort Receiver
-public float ReceiverTravel
+public ConveyorBuoyGroup Group;
+public float Distance, Step;
 ```
 
-#### ReceiverPort
+### EnterRequest
 
 Source: [Assets/Scripts/GameCore/BoardSystem/Conveyor/ConveyorController.cs](../Assets/Scripts/GameCore/BoardSystem/Conveyor/ConveyorController.cs).
 
 ```csharp
-public BuoyStackHolder Holder
-public float Distance
+public float Distance, Spacing;
+public Func<Vector3, float> EstimateArrival;
+public Action<ConveyorBuoyGroup> Accepted;
 ```
 
-#### EnterRequest
-
-Source: [Assets/Scripts/GameCore/BoardSystem/Conveyor/ConveyorController.cs](../Assets/Scripts/GameCore/BoardSystem/Conveyor/ConveyorController.cs).
-
-```csharp
-public float Distance, Spacing
-public Func<Vector3, float> EstimateArrival
-public Action<ConveyorBuoyGroup> Accepted
-```
-
-## Transfers and nested classes
+## Transfers
 
 ```mermaid
 classDiagram
 direction LR
+class BuoyReceiveConfig {
+    -float flightDuration
+    -float launchDelay
+    +float FlightDuration
+    +float LaunchDelay
+}
+ScriptableObject <|-- BuoyReceiveConfig
 class BuoyTransferController {
     -List~Transfer~ transfers
     -List~ReceiveTransfer~ receives
     -ConveyorController conveyor
     -int generation
     -float flightSpeed
+    -BuoyReceiveConfig receiveConfig
+    +SetReceiveConfig(BuoyReceiveConfig config) void
     +BuoyTransferController(ConveyorController conveyor)
     ~BeginReceive(BuoyStack stack, ConveyorBuoyGroup group, Action completed) void
-    +Begin(BuoyStack stack, Vector2Int outlet, Action completed) void
+    +Begin(BuoyStack stack, Vector2Int outlet, BuoyStackHolder sourceHolder, Action completed) void
     +Tick(float deltaTime, float speed, float interval) void
-    -TickReceives(float deltaTime, float speed, float interval) void
+    -LaunchReceiveFlights(ReceiveTransfer transfer) void$
+    -TickReceives(float deltaTime) void
     +Clear() void
 }
 class Transfer {
@@ -788,70 +847,110 @@ class ReceiveTransfer {
     +BuoyStack Stack
     +ConveyorBuoyGroup Group
     +Action Completed
-    +Buoy InFlight
-    +float Timer
+    +List~ReceiveFlight~ Flights
+    +int BaseIndex, Count, Next, Arrived
+    +float Elapsed, Duration, Delay
+}
+class ReceiveFlight {
+    +Buoy Buoy
+    +int Slot
+    +Vector3 StartPosition
+    +float LaunchTime
+    +bool Arrived
 }
 class Flight {
     +Buoy Buoy
     +int Slot
     +bool Arrived
 }
+BuoyTransferController --> BuoyReceiveConfig : snapshot timing
+BuoyTransferController *-- Transfer
+BuoyTransferController *-- ReceiveTransfer
+Transfer *-- Flight
+ReceiveTransfer *-- ReceiveFlight
 ```
 
-### C# declarations and attributes
+### BuoyReceiveConfig
 
-#### BuoyTransferController
+Source: [Assets/Scripts/GameCore/BoardSystem/Buoys/BuoyReceiveConfig.cs](../Assets/Scripts/GameCore/BoardSystem/Buoys/BuoyReceiveConfig.cs).
+
+```csharp
+[Tooltip("Flight duration of each buoy from the conveyor to the stack, in seconds.")] [SerializeField, Min(0.01f)]
+private float flightDuration = 0.4f;
+[Tooltip("Delay between buoy launches. Zero launches the entire group together.")] [SerializeField, Min(0f)]
+private float launchDelay = 0.12f;
+public float FlightDuration => Mathf.Max(0.01f, flightDuration);
+public float LaunchDelay => Mathf.Max(0f, launchDelay);
+```
+
+### BuoyTransferController
 
 Source: [Assets/Scripts/GameCore/BoardSystem/Buoys/BuoyTransferController.cs](../Assets/Scripts/GameCore/BoardSystem/Buoys/BuoyTransferController.cs).
 
 ```csharp
-private readonly List<Transfer> transfers = new List<Transfer>()
-private readonly List<ReceiveTransfer> receives = new List<ReceiveTransfer>()
-private readonly ConveyorController conveyor
-private int generation
-private float flightSpeed = 4f
+private readonly List<Transfer> transfers = new List<Transfer>();
+private readonly List<ReceiveTransfer> receives = new List<ReceiveTransfer>();
+private readonly ConveyorController conveyor;
+private int generation;
+private float flightSpeed = 4f;
+private BuoyReceiveConfig receiveConfig;
+public void SetReceiveConfig(BuoyReceiveConfig config)
 public BuoyTransferController(ConveyorController conveyor)
 internal void BeginReceive(BuoyStack stack, ConveyorBuoyGroup group, Action completed)
-public void Begin(BuoyStack stack, Vector2Int outlet, Action completed)
+public void Begin(BuoyStack stack, Vector2Int outlet, BuoyStackHolder sourceHolder, Action completed)
 public void Tick(float deltaTime, float speed, float interval)
-private void TickReceives(float deltaTime, float speed, float interval)
+private static void LaunchReceiveFlights(ReceiveTransfer transfer)
+private void TickReceives(float deltaTime)
 public void Clear()
 ```
 
-#### Transfer
+### Transfer
 
 Source: [Assets/Scripts/GameCore/BoardSystem/Buoys/BuoyTransferController.cs](../Assets/Scripts/GameCore/BoardSystem/Buoys/BuoyTransferController.cs).
 
 ```csharp
-public BuoyStack Stack
-public List<Buoy> Selected
-public ConveyorBuoyGroup Group
-public Action Completed
-public readonly List<Flight> Flights = new List<Flight>()
-public int Next, Arrived
-public float Timer, Elapsed, ExpectedArrival
+public BuoyStack Stack;
+public List<Buoy> Selected;
+public ConveyorBuoyGroup Group;
+public Action Completed;
+public readonly List<Flight> Flights = new List<Flight>();
+public int Next, Arrived;
+public float Timer, Elapsed, ExpectedArrival;
 ```
 
-#### ReceiveTransfer
+### ReceiveTransfer
 
 Source: [Assets/Scripts/GameCore/BoardSystem/Buoys/BuoyTransferController.cs](../Assets/Scripts/GameCore/BoardSystem/Buoys/BuoyTransferController.cs).
 
 ```csharp
-public BuoyStack Stack
-public ConveyorBuoyGroup Group
-public Action Completed
-public Buoy InFlight
-public float Timer
+public BuoyStack Stack;
+public ConveyorBuoyGroup Group;
+public Action Completed;
+public readonly List<ReceiveFlight> Flights = new List<ReceiveFlight>();
+public int BaseIndex, Count, Next, Arrived;
+public float Elapsed, Duration, Delay;
 ```
 
-#### Flight
+### ReceiveFlight
 
 Source: [Assets/Scripts/GameCore/BoardSystem/Buoys/BuoyTransferController.cs](../Assets/Scripts/GameCore/BoardSystem/Buoys/BuoyTransferController.cs).
 
 ```csharp
-public Buoy Buoy
-public int Slot
-public bool Arrived
+public Buoy Buoy;
+public int Slot;
+public Vector3 StartPosition;
+public float LaunchTime;
+public bool Arrived;
+```
+
+### Flight
+
+Source: [Assets/Scripts/GameCore/BoardSystem/Buoys/BuoyTransferController.cs](../Assets/Scripts/GameCore/BoardSystem/Buoys/BuoyTransferController.cs).
+
+```csharp
+public Buoy Buoy;
+public int Slot;
+public bool Arrived;
 ```
 
 ## Level data and enums
@@ -951,89 +1050,96 @@ class BuoyElementType {
     NormalBouy = 0
     Hidden = 1
 }
+LevelDataSO *-- BoardData
+LevelDataSO *-- PathData
+LevelDataSO *-- BuoyNodeData
+LevelDataSO --> ColorDataSO
+BuoyNodeData *-- BuoyColumnData
+BuoyColumnData *-- BuoyData
+BuoyColumnData *-- ColumnElementData
+BuoyData *-- BuoyElementData
+ColorDataSO *-- ColorEntryData
 ```
 
-### C# declarations and attributes
-
-#### LevelDataSO
+### LevelDataSO
 
 Source: [Assets/Scripts/LevelEditorTools/LevelDataSO.cs](../Assets/Scripts/LevelEditorTools/LevelDataSO.cs).
 
 ```csharp
 [SerializeField]
-private ColorDataSO colorData
+private ColorDataSO colorData;
 [SerializeField]
-private BoardData board = new BoardData()
+private BoardData board = new BoardData();
 [SerializeField]
-private PathData path = new PathData()
+private PathData path = new PathData();
 [SerializeField]
-private List<BuoyNodeData> buoyNodes = new List<BuoyNodeData>()
+private List<BuoyNodeData> buoyNodes = new List<BuoyNodeData>();
 public ColorDataSO ColorData => colorData;
 public BoardData Board => board;
 public PathData Path => path;
 public IReadOnlyList<BuoyNodeData> BuoyNodes => buoyNodes;
 ```
 
-#### BoardData
+### BoardData
 
 Source: [Assets/Scripts/LevelEditorTools/LevelDataSO.cs](../Assets/Scripts/LevelEditorTools/LevelDataSO.cs).
 
 ```csharp
 [SerializeField, Min(1)]
-private int width = 10
+private int width = 10;
 [SerializeField, Min(1)]
-private int height = 10
+private int height = 10;
 [SerializeField, Min(0.01f)]
-private float cellSize = 1f
+private float cellSize = 1f;
 public int Width => width;
 public int Height => height;
 public float CellSize => cellSize;
 ```
 
-#### PathData
+### PathData
 
 Source: [Assets/Scripts/LevelEditorTools/LevelDataSO.cs](../Assets/Scripts/LevelEditorTools/LevelDataSO.cs).
 
 ```csharp
 [SerializeField]
-private bool isClosed
+private bool isClosed;
 [SerializeField]
-private List<Vector2Int> cells = new List<Vector2Int>()
+private List<Vector2Int> cells = new List<Vector2Int>();
 public bool IsClosed => isClosed;
 public IReadOnlyList<Vector2Int> Cells => cells;
 ```
 
-#### BuoyNodeData
+### BuoyNodeData
 
 Source: [Assets/Scripts/LevelEditorTools/LevelDataSO.cs](../Assets/Scripts/LevelEditorTools/LevelDataSO.cs).
 
 ```csharp
 [SerializeField]
-private Vector2Int gridPosition
+private Vector2Int gridPosition;
 [SerializeField]
-private Vector2Int outletDirection
+private Vector2Int outletDirection;
 [SerializeField]
-private List<BuoyColumnData> columns = new List<BuoyColumnData>
+private List<BuoyColumnData> columns = new List<BuoyColumnData> { get; }
 public Vector2Int GridPosition => gridPosition;
 public Vector2Int OutletDirection => outletDirection;
 public Vector2Int OutletCell => gridPosition + outletDirection;
 public IReadOnlyList<BuoyColumnData> Columns => columns;
 ```
 
-#### BuoyColumnData
+### BuoyColumnData
 
 Source: [Assets/Scripts/LevelEditorTools/LevelDataSO.cs](../Assets/Scripts/LevelEditorTools/LevelDataSO.cs).
 
 ```csharp
-public const int DefaultBuoyCount = 5
+public const int DefaultBuoyCount = 5;
 [SerializeField]
-private ColumnElementType columnType = ColumnElementType.NormalPeg
+private ColumnElementType columnType = ColumnElementType.NormalPeg;
 [SerializeField, Min(0)]
-private int columnTypeCount
+private int columnTypeCount;
 [SerializeField]
-private List<ColumnElementData> elements = new List<ColumnElementData>()
+private List<ColumnElementData> elements = new List<ColumnElementData>();
 [SerializeField]
-private List<BuoyData> buoys = CreateDefaultBuoys()
+private List<BuoyData> buoys = CreateDefaultBuoys();
 public ColumnElementType ColumnType => columnType;
 public int ColumnTypeCount => columnTypeCount;
 public IReadOnlyList<ColumnElementData> Elements => elements;
@@ -1042,73 +1148,73 @@ public int BuoyCount => buoys.Count;
 private static List<BuoyData> CreateDefaultBuoys()
 ```
 
-#### BuoyData
+### BuoyData
 
 Source: [Assets/Scripts/LevelEditorTools/LevelDataSO.cs](../Assets/Scripts/LevelEditorTools/LevelDataSO.cs).
 
 ```csharp
 [SerializeField]
-private int colorCode
+private int colorCode;
 [SerializeField]
-private BuoyElementType buoyType = BuoyElementType.NormalBouy
+private BuoyElementType buoyType = BuoyElementType.NormalBouy;
 [SerializeField, Min(0)]
-private int buoyTypeCount
+private int buoyTypeCount;
 [SerializeField]
-private List<BuoyElementData> elements = new List<BuoyElementData>()
+private List<BuoyElementData> elements = new List<BuoyElementData>();
 public int ColorCode => colorCode;
 public BuoyElementType BuoyType => buoyType;
 public int BuoyTypeCount => buoyTypeCount;
 public IReadOnlyList<BuoyElementData> Elements => elements;
 ```
 
-#### ColumnElementData
+### ColumnElementData
 
 Source: [Assets/Scripts/LevelEditorTools/LevelDataSO.cs](../Assets/Scripts/LevelEditorTools/LevelDataSO.cs).
 
 ```csharp
 [SerializeField]
-private string elementId = string.Empty
+private string elementId = string.Empty;
 public string ElementId => elementId;
 ```
 
-#### BuoyElementData
+### BuoyElementData
 
 Source: [Assets/Scripts/LevelEditorTools/LevelDataSO.cs](../Assets/Scripts/LevelEditorTools/LevelDataSO.cs).
 
 ```csharp
 [SerializeField]
-private string elementId = string.Empty
+private string elementId = string.Empty;
 public string ElementId => elementId;
 ```
 
-#### ColorDataSO
+### ColorDataSO
 
 Source: [Assets/Scripts/LevelEditorTools/ColorDataSO.cs](../Assets/Scripts/LevelEditorTools/ColorDataSO.cs).
 
 ```csharp
 [SerializeField]
-private List<ColorEntryData> colors = new List<ColorEntryData>()
+private List<ColorEntryData> colors = new List<ColorEntryData>();
 public IReadOnlyList<ColorEntryData> Colors => colors;
 public bool TryGetColor(int code, out Color color)
 ```
 
-#### ColorEntryData
+### ColorEntryData
 
 Source: [Assets/Scripts/LevelEditorTools/ColorDataSO.cs](../Assets/Scripts/LevelEditorTools/ColorDataSO.cs).
 
 ```csharp
 [SerializeField]
-private int code
+private int code;
 [SerializeField]
-private string displayName = "New Color"
+private string displayName = "New Color";
 [SerializeField]
-private Color color = Color.white
+private Color color = Color.white;
 public int Code => code;
 public string DisplayName => displayName;
 public Color Color => color;
 ```
 
-#### ColumnElementType
+### ColumnElementType
 
 Source: [Assets/Scripts/LevelEditorTools/LevelDataEnums.cs](../Assets/Scripts/LevelEditorTools/LevelDataEnums.cs).
 
@@ -1120,7 +1226,7 @@ IcePeg = 3
 ConveyorCounterBouyTxt = 4
 ```
 
-#### BuoyElementType
+### BuoyElementType
 
 Source: [Assets/Scripts/LevelEditorTools/LevelDataEnums.cs](../Assets/Scripts/LevelEditorTools/LevelDataEnums.cs).
 
@@ -1175,37 +1281,36 @@ class Mode {
 class ListVector3 {
     +List~Vector3~ data
 }
+Outline *-- ListVector3
 ```
 
-### C# declarations and attributes
-
-#### Outline
+### Outline
 
 Source: [Assets/QuickOutline/Scripts/Outline.cs](../Assets/QuickOutline/Scripts/Outline.cs).
 
 ```csharp
-private static HashSet<Mesh> registeredMeshes = new HashSet<Mesh>()
-public Mode OutlineMode
-public Color OutlineColor
-public float OutlineWidth
+private static HashSet<Mesh> registeredMeshes = new HashSet<Mesh>();
+public Mode OutlineMode { get; set; }
+public Color OutlineColor { get; set; }
+public float OutlineWidth { get; set; }
 [SerializeField]
-private Mode outlineMode
+private Mode outlineMode;
 [SerializeField]
-private Color outlineColor = Color.white
+private Color outlineColor = Color.white;
 [SerializeField, Range(0f, 10f)]
-private float outlineWidth = 2f
+private float outlineWidth = 2f;
 [Header("Optional")] [SerializeField, Tooltip("Precompute enabled: Per-vertex calculations are performed in the editor and serialized with the object. " + "Precompute disabled: Per-vertex calculations are performed at runtime in Awake(). This may cause a pause for large meshes.")]
-private bool precomputeOutline
+private bool precomputeOutline;
 [SerializeField, HideInInspector]
-private List<Mesh> bakeKeys = new List<Mesh>()
+private List<Mesh> bakeKeys = new List<Mesh>();
 [SerializeField, HideInInspector]
-private List<ListVector3> bakeValues = new List<ListVector3>()
-private Renderer[] renderers
-private Material outlineMaskMaterial
-private Material outlineFillMaterial
-private bool needsUpdate
-private static int _stencilCounter = 1
-private int _stencilID
+private List<ListVector3> bakeValues = new List<ListVector3>();
+private Renderer[] renderers;
+private Material outlineMaskMaterial;
+private Material outlineFillMaterial;
+private bool needsUpdate;
+private static int _stencilCounter = 1;
+private int _stencilID;
 void Awake()
 void OnEnable()
 void OnValidate()
@@ -1219,7 +1324,7 @@ void CombineSubmeshes(Mesh mesh, Material[] materials)
 public void UpdateMaterialProperties()
 ```
 
-#### Mode
+### Mode
 
 Source: [Assets/QuickOutline/Scripts/Outline.cs](../Assets/QuickOutline/Scripts/Outline.cs).
 
@@ -1231,28 +1336,23 @@ OutlineAndSilhouette
 SilhouetteOnly
 ```
 
-#### ListVector3
+### ListVector3
 
 Source: [Assets/QuickOutline/Scripts/Outline.cs](../Assets/QuickOutline/Scripts/Outline.cs).
 
 ```csharp
-public List<Vector3> data
+public List<Vector3> data;
 ```
 
-## Current behavior notes
+## Current behavior
 
+- Holder VisibleCapacity and decorations are fixed at initialization. Only visible stacks are spawned; pending columns remain data.
+- The empty front stack is disabled after its outgoing transfer completes. The rear stack tweens forward while the replacement appears in the rear slot. Only the front accepts input and groups.
+- The holder root trigger detects a group using Enter/Stay. Group detection uses a trigger sphere and kinematic Rigidbody.
+- Matching loaded groups are claimed with IsReceiving and continue moving while overlapping flights launch to reserved stack indices. Landings commit in order. BuoyReceiveConfig controls flight duration and launch delay; each transfer snapshots its timing settings.
+- DepartureHolder prevents immediate return to the source until its trigger volume has been left.
+- Reset cancels queue tweens and clears flying buoys before destroying stacks/groups.
 
-- All stacks are instantiated at initialization. AdvanceQueue removes empty stacks, sets positions directly and refreshes holder decorations based on the remaining count.
-- Stack colliders currently serve click input; no trigger callback receives a group.
-- ConveyorController checks receiving ports along the spline. BeginReceive sets Moving to false.
-- TickReceives transfers buoys in sequence with one receiving buoy in flight per transfer.
-- Transfers own flying buoys until arrival, then ownership moves to the destination stack/group.
-- Clicked is a local BuoyStack event; completion uses Action callbacks. No Observer is used.
-- Nested types use short names in the diagrams: Transfer, ReceiveTransfer, Flight, PathMoveSlot, GroupPosition, ReceiverPort, EnterRequest, ColorMaterialEntry, ListVector3 and Outline.Mode.
+## Web viewing
 
-
-ConveyorBuoyGroup is now a MonoBehaviour containing both group state and transform-based visual operations. ConveyorController creates it with AddComponent and calls Initialize; no separate group visual component is required.
-
-## Open on the web
-
-Open [ClassDiagram-Web.html](ClassDiagram-Web.html) and choose the full or overview diagram to edit it in Mermaid Live. For importing into another Mermaid-compatible web tool, use [ClassDiagram.mmd](ClassDiagram.mmd) or [ClassDiagram-Overview.mmd](ClassDiagram-Overview.mmd).
+Open [ClassDiagram-Web.html](ClassDiagram-Web.html). Choose a subsystem diagram to reduce layout cost. Import any `.mmd` file into Mermaid-compatible tools. Regenerate with `python Docs/Tools/GenerateClassDiagram.py`.
