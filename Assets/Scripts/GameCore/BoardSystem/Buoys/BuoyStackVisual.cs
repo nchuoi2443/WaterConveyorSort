@@ -19,6 +19,20 @@ namespace WaterConveyorSort.BoardSystem.Buoys
         private bool poleCached;
         private bool inputEnabled;
         private int count;
+        private bool fixedHeight;
+        private float fixedStackHeight;
+        public void SetFixedHeight(float height)
+        {
+            fixedHeight = true;
+            fixedStackHeight = Mathf.Max(0.01f, height);
+            RefreshHeight(count);
+        }
+        public Vector3 GetTopPosition()
+        {
+            if (poleCached)
+                return poleTransform.TransformPoint(new Vector3(poleBounds.center.x, poleBounds.max.y, poleBounds.center.z));
+            return transform.TransformPoint(firstBuoyOffset + Vector3.up * (fixedStackHeight - buoyHeight * 0.5f));
+        }
 
         public void SetInputEnabled(bool enabled)
         {
@@ -32,6 +46,7 @@ namespace WaterConveyorSort.BoardSystem.Buoys
         {
             count = buoyCount;
             float height = count > 0 ? buoyHeight * count + buoySpacing * (count - 1) : Mathf.Max(0f, emptyStackHeight);
+            if (fixedHeight) height = fixedStackHeight;
             if (poleTransform != null)
             {
                 if (!poleCached)
@@ -123,7 +138,6 @@ namespace WaterConveyorSort.BoardSystem.Buoys
             // Source order is bottom to top for the initial layout.
             buoy.SetParent(buoyRoot != null ? buoyRoot : transform, false);
             buoy.localPosition = firstBuoyOffset + Vector3.up * (index * Step);
-            buoy.localRotation = Quaternion.identity;
         }
         private bool released;
 

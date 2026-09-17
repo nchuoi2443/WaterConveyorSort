@@ -26,6 +26,8 @@ namespace WaterConveyorSort.LevelSystem
         [SerializeField] private SplineComputer splineComputer;
         [SerializeField] private SplineMesh splineMesh;
         [SerializeField, Min(0f)] private float moveSpeed = 1f;
+        [Tooltip("Water texture scroll speed. Zero stops scrolling; negative values reverse direction.")]
+        [SerializeField] private float waterSpeed = 1f;
         [Tooltip("Group root height above the spline, along the board's local up axis, in world units.")]
         [SerializeField] private float rootYOffset = 0.2f;
         [SerializeField, Min(0.01f)] private float pathMoveSlotSpacing = 0.3f;
@@ -69,6 +71,7 @@ namespace WaterConveyorSort.LevelSystem
             if (boardManager != null) boardManager.SetMotionSettings(transferSpeed, launchInterval);
             if (boardManager != null) boardManager.SetReceiveSettings(receiveFlightDuration, receiveLaunchDelay);
             if (conveyorController != null) conveyorController.SetMotionSettings(moveSpeed, rootYOffset);
+            if (conveyorController != null) conveyorController.SetWaterSpeed(waterSpeed);
         }
 
         private void Start()

@@ -101,7 +101,7 @@ namespace WaterConveyorSort.BoardSystem.StackQueue
                 reservation.Incoming--;
                 RefreshInput(index);
             }, visual.ReceiveFlightDuration, visual.ReceiveLaunchDelay,
-                consumed => reservation.Count -= consumed);
+                consumed => reservation.Count -= consumed, visual.ReceiveDescentDuration, visual.ReceiveTopClearance);
         }
 
         public bool TryReceive(ConveyorBuoyGroup group)

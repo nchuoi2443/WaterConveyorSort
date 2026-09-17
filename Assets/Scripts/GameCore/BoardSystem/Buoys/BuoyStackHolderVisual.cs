@@ -1,4 +1,5 @@
 using System;
+using TMPro;
 using System.Collections;
 using UnityEngine;
 using WaterConveyorSort.BoardSystem.Conveyor;
@@ -25,6 +26,27 @@ namespace WaterConveyorSort.BoardSystem.Buoys
 
         [SerializeField] private Collider receiveCollider;
         [SerializeField, Min(0f)] private float advanceDuration = 0.3f;
+        [Header("Queue Status")]
+        [SerializeField] private TMP_Text remainingStackText;
+        [SerializeField] private GameObject imgTick;
+        [SerializeField] private Transform statusRoot;
+        [SerializeField] private Camera statusCamera;
+        public void SetQueueStatus(int capacity, int remaining)
+        {
+            bool show = capacity > 1;
+            if (remainingStackText != null)
+            {
+                remainingStackText.text = remaining.ToString();
+                remainingStackText.gameObject.SetActive(show && remaining > 0);
+            }
+            if (imgTick != null) imgTick.SetActive(show && remaining == 0);
+        }
+        private void LateUpdate()
+        {
+            if (statusRoot == null) return;
+            Camera camera = statusCamera != null ? statusCamera : Camera.main;
+            if (camera != null) statusRoot.rotation = camera.transform.rotation;
+        }
         private BuoyStackHolder owner;
         private Coroutine advanceTween;
 

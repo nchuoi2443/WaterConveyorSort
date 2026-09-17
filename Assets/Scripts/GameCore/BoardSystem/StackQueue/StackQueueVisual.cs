@@ -12,6 +12,11 @@ namespace WaterConveyorSort.BoardSystem.StackQueue
         [SerializeField, Min(0.01f)] private float stackSpacing = 1.2f;
         [SerializeField, Min(0.01f)] private float receiveFlightDuration = 0.4f;
         [SerializeField, Min(0f)] private float receiveLaunchDelay = 0.12f;
+        [SerializeField, Min(0.01f)] private float fixedStackHeight = 1f;
+        [SerializeField, Min(0.01f)] private float receiveDescentDuration = 0.25f;
+        [SerializeField, Min(0f)] private float receiveTopClearance = 0.2f;
+        public float ReceiveDescentDuration => Mathf.Max(0.01f, receiveDescentDuration);
+        public float ReceiveTopClearance => Mathf.Max(0f, receiveTopClearance);
         public float ReceiveFlightDuration => Mathf.Max(0.01f, receiveFlightDuration);
         public float ReceiveLaunchDelay => Mathf.Max(0f, receiveLaunchDelay);
 
@@ -31,7 +36,7 @@ namespace WaterConveyorSort.BoardSystem.StackQueue
             visual.transform.localPosition = GetStackOffset(index, count);
             visual.transform.localRotation = Quaternion.identity;
             visual.SetInputEnabled(false);
-            visual.RefreshHeight(0);
+            visual.SetFixedHeight(fixedStackHeight);
             return visual;
         }
     }

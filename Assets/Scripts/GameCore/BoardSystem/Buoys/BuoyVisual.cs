@@ -41,6 +41,30 @@ namespace WaterConveyorSort.BoardSystem.Buoys
             return (transform.position - target).sqrMagnitude <= 0.000001f;
         }
 
+        [Tooltip("Optional model child to spin independently of the movement root.")]
+        [SerializeField] private Transform spinRoot;
+        [Tooltip("Head visual hidden during flight and shown again on landing.")]
+        [SerializeField] private GameObject head;
+        [SerializeField, Min(0f)] private float flightArcHeight = 1f;
+        public float FlightArcHeight => Mathf.Max(0f, flightArcHeight);
+        private Transform spinningTransform;
+        private Quaternion flightRotation;
+        public void BeginFlight()
+        {
+            if (head != null) head.SetActive(false);
+            spinningTransform = spinRoot != null ? spinRoot : transform;
+            flightRotation = spinningTransform.localRotation;
+        }
+        public void SetFlightProgress(float progress)
+        {
+            if (spinningTransform != null)
+                spinningTransform.localRotation = flightRotation * Quaternion.AngleAxis(180f * Mathf.Clamp01(progress), Vector3.right);
+        }
+        public void EndFlight()
+        {
+            spinningTransform = null;
+            if (head != null) head.SetActive(true);
+        }
         private bool released;
 
         public void Release()

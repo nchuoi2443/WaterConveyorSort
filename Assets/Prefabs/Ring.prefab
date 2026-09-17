@@ -48,6 +48,10 @@ MonoBehaviour:
   colorRenderers:
   - {fileID: 7736673831620230867}
   - {fileID: 7668804507500991020}
+  colorConfig: {fileID: 0}
+  spinRoot: {fileID: 0}
+  head: {fileID: 8173449902822355961}
+  flightArcHeight: 1
 --- !u!1 &1464720868944155595
 GameObject:
   m_ObjectHideFlags: 0
@@ -284,6 +288,12 @@ PrefabInstance:
 --- !u!23 &7668804507500991020 stripped
 MeshRenderer:
   m_CorrespondingSourceObject: {fileID: -7511558181221131132, guid: 365332e8fb86eef44a72ec28e5eae685,
+    type: 3}
+  m_PrefabInstance: {fileID: 9055758843713179304}
+  m_PrefabAsset: {fileID: 0}
+--- !u!1 &8173449902822355961 stripped
+GameObject:
+  m_CorrespondingSourceObject: {fileID: 919132149155446097, guid: 365332e8fb86eef44a72ec28e5eae685,
     type: 3}
   m_PrefabInstance: {fileID: 9055758843713179304}
   m_PrefabAsset: {fileID: 0}

@@ -18,6 +18,7 @@ namespace WaterConveyorSort.BoardSystem.Buoys
         public IReadOnlyList<BuoyStack> Stacks { get; }
         public BuoyStack ActiveStack => stacks.Count > 0 ? stacks[0] : null;
         public int VisibleCapacity { get; }
+        public int RemainingStackCount => Mathf.Max(0, stacks.Count + pending.Count - 1);
         public Vector2Int GridPosition { get; }
         public Vector2Int OutletDirection { get; }
         public Vector2Int OutletCell => GridPosition + OutletDirection;
@@ -116,6 +117,7 @@ namespace WaterConveyorSort.BoardSystem.Buoys
 
         private void RefreshInput()
         {
+            if (!cleared) visual.SetQueueStatus(VisibleCapacity, RemainingStackCount);
             if (!cleared) visual.SetVisible(stacks.Count > 0 || pending.Count > 0);
             for (int i = 0; i < stacks.Count; i++)
                 stacks[i].CanReceiveInput = i == 0 && !busy && !cleared && transfer != null;

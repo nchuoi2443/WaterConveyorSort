@@ -10,6 +10,21 @@ namespace WaterConveyorSort.BoardSystem.Conveyor
     {
         private SplineComputer splineComputer;
         private SplineMesh splineMesh;
+        private static readonly int WaterSpeedId = Shader.PropertyToID("_WaterSpeed");
+        private MaterialPropertyBlock waterProperties;
+
+        public void SetWaterSpeed(float speed)
+        {
+            if (splineMesh == null) return;
+            Renderer renderer = splineMesh.GetComponent<Renderer>();
+            if (renderer == null) return;
+            Material[] materials = renderer.sharedMaterials;
+            if (materials[0] == null || !materials[0].HasProperty(WaterSpeedId)) return;
+                waterProperties ??= new MaterialPropertyBlock();
+                renderer.GetPropertyBlock(waterProperties, 0);
+                waterProperties.SetFloat(WaterSpeedId, speed);
+                renderer.SetPropertyBlock(waterProperties, 0);
+        }
 
         private float moveSpeed = 1f;
         private float rootYOffset = 0.2f;

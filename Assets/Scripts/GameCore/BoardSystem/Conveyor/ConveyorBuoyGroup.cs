@@ -53,7 +53,6 @@ namespace WaterConveyorSort.BoardSystem.Conveyor
         {
             buoy.Visual.transform.SetParent(transform, true);
             buoy.Visual.transform.localPosition = Vector3.up * (slot * spacing);
-            buoy.Visual.transform.localRotation = Quaternion.identity;
             buoys.Add(buoy);
             if (slot == 0) Moving = true;
         }
