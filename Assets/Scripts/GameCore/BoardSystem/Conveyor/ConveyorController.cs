@@ -13,6 +13,9 @@ namespace WaterConveyorSort.BoardSystem.Conveyor
 
         private float moveSpeed = 1f;
         private float rootYOffset = 0.2f;
+        private bool paused;
+        public event Action<ConveyorBuoyGroup> ReachedEnd;
+        public void SetPaused(bool value) => paused = value;
         public void Configure(SplineComputer computer, SplineMesh mesh)
         {
             splineComputer = computer;
@@ -36,6 +39,11 @@ namespace WaterConveyorSort.BoardSystem.Conveyor
         private readonly List<GroupPosition> positions = new List<GroupPosition>();
         private float slotSpacing = 0.3f;
         private float groupGap = 0.6f;
+        internal void DetachGroup(ConveyorBuoyGroup group)
+        {
+            positions.RemoveAll(position => position.Group == group);
+            group.Moving = false;
+        }
         internal void RemoveGroup(ConveyorBuoyGroup group)
         {
             positions.RemoveAll(position => position.Group == group);
@@ -154,7 +162,7 @@ namespace WaterConveyorSort.BoardSystem.Conveyor
 
         private void Update()
         {
-            if (_pathMoveSlots.Count < 2) return;
+            if (paused || _pathMoveSlots.Count < 2) return;
             positions.Sort((a, b) => a.Distance.CompareTo(b.Distance));
             float step = MoveSpeed * Time.deltaTime;
             foreach (GroupPosition position in positions)
@@ -184,6 +192,15 @@ namespace WaterConveyorSort.BoardSystem.Conveyor
                 PlaceGroup(position);
             }
             ProcessEntries();
+            if (!closed)
+                for (int i = positions.Count - 1; i >= 0 && !paused; i--)
+                {
+                    GroupPosition position = positions[i];
+                    if (position.Distance < length || position.EndNotified ||
+                        !position.Group.IsLoaded || position.Group.IsReceiving) continue;
+                    position.EndNotified = true;
+                    ReachedEnd?.Invoke(position.Group);
+                }
         }
 
         private sealed class PathMoveSlot
@@ -195,6 +212,7 @@ namespace WaterConveyorSort.BoardSystem.Conveyor
         {
             public ConveyorBuoyGroup Group;
             public float Distance, Step;
+            public bool EndNotified;
         }
         private sealed class EnterRequest
         {

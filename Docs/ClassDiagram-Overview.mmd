@@ -2,13 +2,22 @@ classDiagram
 direction LR
 LevelManager --> LevelDataSO : reads
 LevelManager --> BoardManager : initializes
-LevelManager --> BuoyReceiveConfig : receive settings
-BoardManager --> BuoyReceiveConfig
-BuoyTransferController --> BuoyReceiveConfig : snapshot timing
 LevelManager --> ConveyorController : configures
 BoardManager *-- BuoyStackHolderController
 BoardManager *-- BuoyTransferController : ticks flights
 BoardManager --> ConveyorController
+BoardManager *-- StackQueueController
+BoardManager --> StackQueueVisual
+BoardManager --> StackQueueExit
+LevelManager --> StackQueueVisual
+LevelManager --> StackQueueExit
+LevelManager --> BoardManager : queue failure to Lost
+StackQueueController *-- BuoyStack : queue contents
+StackQueueController *-- StackReservation
+StackQueueController --> StackQueueVisual
+StackQueueController --> ConveyorController : detach at exit
+StackQueueController --> BuoyTransferController : reserved landings
+StackQueueExit --> StackQueueController : trigger entry
 BuoyStackHolderController *-- BuoyStackHolder
 BuoyStackHolderController ..> BuoyStack : lazy factory
 BuoyStackHolder *-- BuoyStack : visible slots

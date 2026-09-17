@@ -1,0 +1,50 @@
+classDiagram
+direction LR
+class StackQueueController {
+    -List~BuoyStack~ stacks
+    -List~StackReservation~ reservations
+    -ConveyorController conveyor
+    -BuoyTransferController transfers
+    -StackQueueVisual visual
+    -bool accepting
+    -bool failed
+    +IReadOnlyList~BuoyStack~ Stacks
+    +Action Full
+    +StackQueueController(ConveyorController conveyor, BuoyTransferController transfers, StackQueueVisual visual)
+    +Initialize(int count) void
+    +SetPaused(bool paused) void
+    +TryReceive(ConveyorBuoyGroup group) bool
+    -FindStack(int color) int
+    +Clear() void
+}
+class StackReservation {
+    +int Count
+    +int ColorCode
+}
+class StackQueueExit {
+    -StackQueueController queue
+    +Initialize(StackQueueController controller) void
+    +Clear() void
+    -Awake() void
+    -OnTriggerEnter(Collider other) void
+    -OnTriggerStay(Collider other) void
+    -DetectGroup(Collider other) void
+    -OnDrawGizmosSelected() void
+}
+MonoBehaviour <|-- StackQueueExit
+class StackQueueVisual {
+    -Transform spawnRoot
+    -BuoyStackVisual stackPrefab
+    -float stackSpacing
+    -float receiveFlightDuration
+    -float receiveLaunchDelay
+    +float ReceiveFlightDuration
+    +float ReceiveLaunchDelay
+    +ValidateSetup() void
+    +GetStackOffset(int index, int count) Vector3
+    ~SpawnStack(int index, int count) BuoyStackVisual
+}
+MonoBehaviour <|-- StackQueueVisual
+StackQueueController *-- StackReservation
+StackQueueController --> StackQueueVisual
+StackQueueExit --> StackQueueController : trigger entry

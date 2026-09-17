@@ -12,16 +12,29 @@ namespace WaterConveyorSort.BoardSystem.Buoys
         private readonly ConveyorController conveyor;
         private int generation;
         private float flightSpeed = 4f;
-        private BuoyReceiveConfig receiveConfig;
-        public void SetReceiveConfig(BuoyReceiveConfig config) => receiveConfig = config;
+        private float receiveFlightDuration = 0.4f;
+        private float receiveLaunchDelay = 0.12f;
+        public bool IsPaused { get; private set; }
+        public void SetPaused(bool paused) => IsPaused = paused;
+        public void SetReceiveSettings(float duration, float delay)
+        {
+            receiveFlightDuration = Mathf.Max(0.01f, duration);
+            receiveLaunchDelay = Mathf.Max(0f, delay);
+        }
         public BuoyTransferController(ConveyorController conveyor) { this.conveyor = conveyor; }
         internal void BeginReceive(BuoyStack stack, ConveyorBuoyGroup group, Action completed)
         {
+            BeginReceive(stack, group, stack.Buoys.Count, completed);
+        }
+        internal void BeginReceive(BuoyStack stack, ConveyorBuoyGroup group, int baseIndex,
+            Action completed, float? duration = null, float? delay = null)
+        {
+            if (IsPaused || group.IsReceiving) throw new InvalidOperationException("The group cannot start another receive transfer.");
             group.IsReceiving = true;
             var transfer = new ReceiveTransfer { Stack = stack, Group = group, Completed = completed,
-                BaseIndex = stack.Buoys.Count, Count = group.Buoys.Count,
-                Duration = receiveConfig != null ? receiveConfig.FlightDuration : 0.4f,
-                Delay = receiveConfig != null ? receiveConfig.LaunchDelay : 0.12f };
+                BaseIndex = baseIndex, Count = group.Buoys.Count,
+                Duration = Mathf.Max(0.01f, duration ?? receiveFlightDuration),
+                Delay = Mathf.Max(0f, delay ?? receiveLaunchDelay) };
             receives.Add(transfer);
             LaunchReceiveFlights(transfer);
         }
@@ -43,6 +56,7 @@ namespace WaterConveyorSort.BoardSystem.Buoys
         }
         public void Tick(float deltaTime, float speed, float interval)
         {
+            if (IsPaused) return;
             flightSpeed = speed;
             for (int t = transfers.Count - 1; t >= 0; t--)
             {
@@ -110,6 +124,7 @@ namespace WaterConveyorSort.BoardSystem.Buoys
                     if (progress < 1f) continue;
                     // Commit landings in launch order, even if a later flight catches up.
                     if (flight.Slot != transfer.Arrived) continue;
+                    if (transfer.Stack.Buoys.Count != transfer.BaseIndex + flight.Slot) continue;
                     transfer.Stack.AddBuoy(flight.Buoy);
                     flight.Arrived = true;
                     transfer.Arrived++;
@@ -117,7 +132,7 @@ namespace WaterConveyorSort.BoardSystem.Buoys
                 if (transfer.Arrived != transfer.Count) continue;
                 receives.RemoveAt(i);
                 conveyor.RemoveGroup(transfer.Group);
-                transfer.Completed();
+                transfer.Completed?.Invoke();
             }
         }
         public void Clear()

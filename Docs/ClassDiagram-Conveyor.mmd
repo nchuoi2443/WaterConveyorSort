@@ -34,6 +34,9 @@ class ConveyorController {
     -SplineMesh splineMesh
     -float moveSpeed
     -float rootYOffset
+    -bool paused
+    +Action~ConveyorBuoyGroup~ ReachedEnd
+    +SetPaused(bool value) void
     +Configure(SplineComputer computer, SplineMesh mesh) void
     +SetMotionSettings(float speed, float yOffset) void
     +float MoveSpeed
@@ -48,6 +51,7 @@ class ConveyorController {
     -List~GroupPosition~ positions
     -float slotSpacing
     -float groupGap
+    ~DetachGroup(ConveyorBuoyGroup group) void
     ~RemoveGroup(ConveyorBuoyGroup group) void
     +ConfigurePathSlots(float spacing, float minimumGap) void
     +RequestEntry(Vector2Int outletCell, float spacing, Func~Vector3_float~ estimateArrival, Action~ConveyorBuoyGroup~ accepted) void
@@ -70,6 +74,7 @@ class PathMoveSlot {
 class GroupPosition {
     +ConveyorBuoyGroup Group
     +float Distance, Step
+    +bool EndNotified
 }
 class EnterRequest {
     +float Distance, Spacing

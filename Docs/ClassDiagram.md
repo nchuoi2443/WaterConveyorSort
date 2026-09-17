@@ -13,13 +13,22 @@ classDiagram
 direction LR
 LevelManager --> LevelDataSO : reads
 LevelManager --> BoardManager : initializes
-LevelManager --> BuoyReceiveConfig : receive settings
-BoardManager --> BuoyReceiveConfig
-BuoyTransferController --> BuoyReceiveConfig : snapshot timing
 LevelManager --> ConveyorController : configures
 BoardManager *-- BuoyStackHolderController
 BoardManager *-- BuoyTransferController : ticks flights
 BoardManager --> ConveyorController
+BoardManager *-- StackQueueController
+BoardManager --> StackQueueVisual
+BoardManager --> StackQueueExit
+LevelManager --> StackQueueVisual
+LevelManager --> StackQueueExit
+LevelManager --> BoardManager : queue failure to Lost
+StackQueueController *-- BuoyStack : queue contents
+StackQueueController *-- StackReservation
+StackQueueController --> StackQueueVisual
+StackQueueController --> ConveyorController : detach at exit
+StackQueueController --> BuoyTransferController : reserved landings
+StackQueueExit --> StackQueueController : trigger entry
 BuoyStackHolderController *-- BuoyStackHolder
 BuoyStackHolderController ..> BuoyStack : lazy factory
 BuoyStackHolder *-- BuoyStack : visible slots
@@ -81,16 +90,26 @@ class BoardManager {
     -BuoyStackVisual buoyStackPrefab
     -BuoyStackHolderVisual buoyStackHolderPrefab
     -InputSystem inputSystem
+    -StackQueueVisual stackQueueVisual
+    -StackQueueExit stackQueueExit
+    -StackQueueController stackQueue
+    +StackQueueController StackQueue
+    +Action StackQueueFull
+    +ConfigureStackQueue(StackQueueVisual visual, StackQueueExit exit) void
+    +SetPaused(bool paused) void
+    -OnQueueFull() void
+    -OnConveyorEnd(ConveyorBuoyGroup group) void
     -float transferSpeed
     -float launchInterval
-    -BuoyReceiveConfig receiveConfig
-    +SetReceiveConfig(BuoyReceiveConfig config) void
+    -float receiveFlightDuration
+    -float receiveLaunchDelay
+    +SetReceiveSettings(float duration, float delay) void
     +Configure(Transform root, ConveyorController conveyor, InputSystem input, BuoyVisual buoy, BuoyStackVisual stack, BuoyStackHolderVisual holder) void
     +SetMotionSettings(float speed, float interval) void
     -BuoyTransferController transfers
     -LateUpdate() void
     -BuoyStackHolderController buoyStackHolderController
-    +InitBoard(BoardData boardData, PathData pathData, IReadOnlyList~BuoyNodeData~ nodes, ColorDataSO colors) void
+    +InitBoard(BoardData boardData, PathData pathData, IReadOnlyList~BuoyNodeData~ nodes, ColorDataSO colors, int maxStackInStackQueue = 3) void
     -OnDestroy() void
 }
 MonoBehaviour <|-- BoardManager
@@ -130,7 +149,14 @@ class LevelManager {
     -float conveyorGroupGap
     -float transferSpeed
     -float launchInterval
-    -BuoyReceiveConfig receiveConfig
+    -float receiveFlightDuration
+    -float receiveLaunchDelay
+    -StackQueueVisual stackQueueVisual
+    -StackQueueExit stackQueueExit
+    +bool HasLost
+    +Action Lost
+    -OnStackQueueFull() void
+    -OnDestroy() void
     -OnValidate() void
     -ApplyMotionSettings() void
     -Start() void
@@ -138,6 +164,7 @@ class LevelManager {
 }
 MonoBehaviour <|-- LevelManager
 LevelManager --> BoardManager : initializes
+LevelManager --> BoardManager : queue failure to Lost
 InputSystem --> IInputReceiver : dispatches clicks
 ```
 
@@ -161,16 +188,26 @@ private BuoyVisual buoyPrefab;
 private BuoyStackVisual buoyStackPrefab;
 private BuoyStackHolderVisual buoyStackHolderPrefab;
 private InputSystem inputSystem;
+private StackQueueVisual stackQueueVisual;
+private StackQueueExit stackQueueExit;
+private StackQueueController stackQueue;
+public StackQueueController StackQueue => stackQueue;
+public event Action StackQueueFull;
+public void ConfigureStackQueue(StackQueueVisual visual, StackQueueExit exit)
+public void SetPaused(bool paused)
+private void OnQueueFull()
+private void OnConveyorEnd(ConveyorBuoyGroup group)
 private float transferSpeed = 4f;
 private float launchInterval = 0.12f;
-private BuoyReceiveConfig receiveConfig;
-public void SetReceiveConfig(BuoyReceiveConfig config)
+private float receiveFlightDuration = 0.4f;
+private float receiveLaunchDelay = 0.12f;
+public void SetReceiveSettings(float duration, float delay)
 public void Configure(Transform root, ConveyorController conveyor, InputSystem input, BuoyVisual buoy, BuoyStackVisual stack, BuoyStackHolderVisual holder)
 public void SetMotionSettings(float speed, float interval)
 private BuoyTransferController transfers;
 private void LateUpdate()
 private readonly BuoyStackHolderController buoyStackHolderController = new BuoyStackHolderController();
-public void InitBoard(BoardData boardData, PathData pathData, IReadOnlyList<BuoyNodeData> nodes, ColorDataSO colors)
+public void InitBoard(BoardData boardData, PathData pathData, IReadOnlyList<BuoyNodeData> nodes, ColorDataSO colors, int maxStackInStackQueue = 3)
 private void OnDestroy()
 ```
 
@@ -241,8 +278,18 @@ private float conveyorGroupGap = 0.6f;
 private float transferSpeed = 4f;
 [SerializeField, Min(0f)]
 private float launchInterval = 0.12f;
-[Header("Conveyor To Stack")] [SerializeField]
-private BuoyReceiveConfig receiveConfig;
+[Header("Conveyor To Stack")] [SerializeField, Min(0.01f)]
+private float receiveFlightDuration = 0.4f;
+[SerializeField, Min(0f)]
+private float receiveLaunchDelay = 0.12f;
+[Header("Stack Queue")] [SerializeField]
+private StackQueueVisual stackQueueVisual;
+[SerializeField]
+private StackQueueExit stackQueueExit;
+public bool HasLost { get; set; }
+public event Action Lost;
+private void OnStackQueueFull()
+private void OnDestroy()
 private void OnValidate()
 private void ApplyMotionSettings()
 private void Start()
@@ -362,6 +409,7 @@ class BuoyStackVisual {
     -Vector3 firstBuoyOffset
     -float buoySpacing
     -float buoyHeight
+    -float emptyStackHeight
     -Transform poleTransform
     +float Step
     -Vector3 poleScale, polePosition
@@ -379,6 +427,7 @@ class BuoyStackVisual {
     +OnClick() void
     -OnEnable() void
     -OnDisable() void
+    -OnValidate() void
     -RegisterInput() void
     -UnregisterInput() void
     +GetBuoyPosition(int index) Vector3
@@ -570,6 +619,8 @@ private Vector3 firstBuoyOffset = new Vector3(0f, 0.2f, 0f);
 private float buoySpacing = 0f;
 [SerializeField, Min(0.01f)]
 private float buoyHeight = 0.2f;
+[Tooltip("Pole height in stack-local units when there are no buoys. Zero hides the empty pole.")] [SerializeField, Min(0f)]
+private float emptyStackHeight = 0.2f;
 [SerializeField]
 private Transform poleTransform;
 public float Step => buoyHeight + buoySpacing;
@@ -589,6 +640,7 @@ public void BindInput(BuoyStack stack, InputSystem system)
 public void OnClick()
 private void OnEnable()
 private void OnDisable()
+private void OnValidate()
 private void RegisterInput()
 private void UnregisterInput()
 public Vector3 GetBuoyPosition(int index)
@@ -653,6 +705,9 @@ class ConveyorController {
     -SplineMesh splineMesh
     -float moveSpeed
     -float rootYOffset
+    -bool paused
+    +Action~ConveyorBuoyGroup~ ReachedEnd
+    +SetPaused(bool value) void
     +Configure(SplineComputer computer, SplineMesh mesh) void
     +SetMotionSettings(float speed, float yOffset) void
     +float MoveSpeed
@@ -667,6 +722,7 @@ class ConveyorController {
     -List~GroupPosition~ positions
     -float slotSpacing
     -float groupGap
+    ~DetachGroup(ConveyorBuoyGroup group) void
     ~RemoveGroup(ConveyorBuoyGroup group) void
     +ConfigurePathSlots(float spacing, float minimumGap) void
     +RequestEntry(Vector2Int outletCell, float spacing, Func~Vector3_float~ estimateArrival, Action~ConveyorBuoyGroup~ accepted) void
@@ -689,6 +745,7 @@ class PathMoveSlot {
 class GroupPosition {
     +ConveyorBuoyGroup Group
     +float Distance, Step
+    +bool EndNotified
 }
 class EnterRequest {
     +float Distance, Spacing
@@ -749,6 +806,9 @@ private SplineComputer splineComputer;
 private SplineMesh splineMesh;
 private float moveSpeed = 1f;
 private float rootYOffset = 0.2f;
+private bool paused;
+public event Action<ConveyorBuoyGroup> ReachedEnd;
+public void SetPaused(bool value)
 public void Configure(SplineComputer computer, SplineMesh mesh)
 public void SetMotionSettings(float speed, float yOffset)
 public float MoveSpeed => Mathf.Max(0f, moveSpeed);
@@ -763,6 +823,7 @@ private readonly List<EnterRequest> waiting = new List<EnterRequest>();
 private readonly List<GroupPosition> positions = new List<GroupPosition>();
 private float slotSpacing = 0.3f;
 private float groupGap = 0.6f;
+internal void DetachGroup(ConveyorBuoyGroup group)
 internal void RemoveGroup(ConveyorBuoyGroup group)
 public void ConfigurePathSlots(float spacing, float minimumGap)
 public void RequestEntry(Vector2Int outletCell, float spacing, Func<Vector3, float> estimateArrival, Action<ConveyorBuoyGroup> accepted)
@@ -794,6 +855,7 @@ Source: [Assets/Scripts/GameCore/BoardSystem/Conveyor/ConveyorController.cs](../
 ```csharp
 public ConveyorBuoyGroup Group;
 public float Distance, Step;
+public bool EndNotified;
 ```
 
 ### EnterRequest
@@ -806,28 +868,148 @@ public Func<Vector3, float> EstimateArrival;
 public Action<ConveyorBuoyGroup> Accepted;
 ```
 
+## Stack queue and exit
+
+```mermaid
+classDiagram
+direction LR
+class StackQueueController {
+    -List~BuoyStack~ stacks
+    -List~StackReservation~ reservations
+    -ConveyorController conveyor
+    -BuoyTransferController transfers
+    -StackQueueVisual visual
+    -bool accepting
+    -bool failed
+    +IReadOnlyList~BuoyStack~ Stacks
+    +Action Full
+    +StackQueueController(ConveyorController conveyor, BuoyTransferController transfers, StackQueueVisual visual)
+    +Initialize(int count) void
+    +SetPaused(bool paused) void
+    +TryReceive(ConveyorBuoyGroup group) bool
+    -FindStack(int color) int
+    +Clear() void
+}
+class StackReservation {
+    +int Count
+    +int ColorCode
+}
+class StackQueueExit {
+    -StackQueueController queue
+    +Initialize(StackQueueController controller) void
+    +Clear() void
+    -Awake() void
+    -OnTriggerEnter(Collider other) void
+    -OnTriggerStay(Collider other) void
+    -DetectGroup(Collider other) void
+    -OnDrawGizmosSelected() void
+}
+MonoBehaviour <|-- StackQueueExit
+class StackQueueVisual {
+    -Transform spawnRoot
+    -BuoyStackVisual stackPrefab
+    -float stackSpacing
+    -float receiveFlightDuration
+    -float receiveLaunchDelay
+    +float ReceiveFlightDuration
+    +float ReceiveLaunchDelay
+    +ValidateSetup() void
+    +GetStackOffset(int index, int count) Vector3
+    ~SpawnStack(int index, int count) BuoyStackVisual
+}
+MonoBehaviour <|-- StackQueueVisual
+StackQueueController *-- StackReservation
+StackQueueController --> StackQueueVisual
+StackQueueExit --> StackQueueController : trigger entry
+```
+
+### StackQueueController
+
+Source: [Assets/Scripts/GameCore/BoardSystem/StackQueue/StackQueueController.cs](../Assets/Scripts/GameCore/BoardSystem/StackQueue/StackQueueController.cs).
+
+```csharp
+private readonly List<BuoyStack> stacks = new List<BuoyStack>();
+private readonly List<StackReservation> reservations = new List<StackReservation>();
+private readonly ConveyorController conveyor;
+private readonly BuoyTransferController transfers;
+private readonly StackQueueVisual visual;
+private bool accepting;
+private bool failed;
+public IReadOnlyList<BuoyStack> Stacks { get; }
+public event Action Full;
+public StackQueueController(ConveyorController conveyor, BuoyTransferController transfers, StackQueueVisual visual)
+public void Initialize(int count)
+public void SetPaused(bool paused)
+public bool TryReceive(ConveyorBuoyGroup group)
+private int FindStack(int color)
+public void Clear()
+```
+
+### StackReservation
+
+Source: [Assets/Scripts/GameCore/BoardSystem/StackQueue/StackQueueController.cs](../Assets/Scripts/GameCore/BoardSystem/StackQueue/StackQueueController.cs).
+
+```csharp
+public int Count;
+public int ColorCode;
+```
+
+### StackQueueExit
+
+Source: [Assets/Scripts/GameCore/BoardSystem/StackQueue/StackQueueExit.cs](../Assets/Scripts/GameCore/BoardSystem/StackQueue/StackQueueExit.cs).
+
+```csharp
+private StackQueueController queue;
+public void Initialize(StackQueueController controller)
+public void Clear()
+private void Awake()
+private void OnTriggerEnter(Collider other)
+private void OnTriggerStay(Collider other)
+private void DetectGroup(Collider other)
+private void OnDrawGizmosSelected()
+```
+
+### StackQueueVisual
+
+Source: [Assets/Scripts/GameCore/BoardSystem/StackQueue/StackQueueVisual.cs](../Assets/Scripts/GameCore/BoardSystem/StackQueue/StackQueueVisual.cs).
+
+```csharp
+[Tooltip("Separate spawn transform. Its position is the center of the stack row.")] [SerializeField]
+private Transform spawnRoot;
+[SerializeField]
+private BuoyStackVisual stackPrefab;
+[SerializeField, Min(0.01f)]
+private float stackSpacing = 1.2f;
+[SerializeField, Min(0.01f)]
+private float receiveFlightDuration = 0.4f;
+[SerializeField, Min(0f)]
+private float receiveLaunchDelay = 0.12f;
+public float ReceiveFlightDuration => Mathf.Max(0.01f, receiveFlightDuration);
+public float ReceiveLaunchDelay => Mathf.Max(0f, receiveLaunchDelay);
+public void ValidateSetup()
+public Vector3 GetStackOffset(int index, int count)
+internal BuoyStackVisual SpawnStack(int index, int count)
+```
+
 ## Transfers
 
 ```mermaid
 classDiagram
 direction LR
-class BuoyReceiveConfig {
-    -float flightDuration
-    -float launchDelay
-    +float FlightDuration
-    +float LaunchDelay
-}
-ScriptableObject <|-- BuoyReceiveConfig
 class BuoyTransferController {
     -List~Transfer~ transfers
     -List~ReceiveTransfer~ receives
     -ConveyorController conveyor
     -int generation
     -float flightSpeed
-    -BuoyReceiveConfig receiveConfig
-    +SetReceiveConfig(BuoyReceiveConfig config) void
+    -float receiveFlightDuration
+    -float receiveLaunchDelay
+    +bool IsPaused
+    +SetPaused(bool paused) void
+    +SetReceiveSettings(float duration, float delay) void
     +BuoyTransferController(ConveyorController conveyor)
     ~BeginReceive(BuoyStack stack, ConveyorBuoyGroup group, Action completed) void
+    ~BeginReceive(BuoyStack stack, ConveyorBuoyGroup group, int baseIndex, Action completed, float? duration = null, float? delay = null) void
     +Begin(BuoyStack stack, Vector2Int outlet, BuoyStackHolder sourceHolder, Action completed) void
     +Tick(float deltaTime, float speed, float interval) void
     -LaunchReceiveFlights(ReceiveTransfer transfer) void$
@@ -863,24 +1045,10 @@ class Flight {
     +int Slot
     +bool Arrived
 }
-BuoyTransferController --> BuoyReceiveConfig : snapshot timing
 BuoyTransferController *-- Transfer
 BuoyTransferController *-- ReceiveTransfer
 Transfer *-- Flight
 ReceiveTransfer *-- ReceiveFlight
-```
-
-### BuoyReceiveConfig
-
-Source: [Assets/Scripts/GameCore/BoardSystem/Buoys/BuoyReceiveConfig.cs](../Assets/Scripts/GameCore/BoardSystem/Buoys/BuoyReceiveConfig.cs).
-
-```csharp
-[Tooltip("Flight duration of each buoy from the conveyor to the stack, in seconds.")] [SerializeField, Min(0.01f)]
-private float flightDuration = 0.4f;
-[Tooltip("Delay between buoy launches. Zero launches the entire group together.")] [SerializeField, Min(0f)]
-private float launchDelay = 0.12f;
-public float FlightDuration => Mathf.Max(0.01f, flightDuration);
-public float LaunchDelay => Mathf.Max(0f, launchDelay);
 ```
 
 ### BuoyTransferController
@@ -893,10 +1061,14 @@ private readonly List<ReceiveTransfer> receives = new List<ReceiveTransfer>();
 private readonly ConveyorController conveyor;
 private int generation;
 private float flightSpeed = 4f;
-private BuoyReceiveConfig receiveConfig;
-public void SetReceiveConfig(BuoyReceiveConfig config)
+private float receiveFlightDuration = 0.4f;
+private float receiveLaunchDelay = 0.12f;
+public bool IsPaused { get; set; }
+public void SetPaused(bool paused)
+public void SetReceiveSettings(float duration, float delay)
 public BuoyTransferController(ConveyorController conveyor)
 internal void BeginReceive(BuoyStack stack, ConveyorBuoyGroup group, Action completed)
+internal void BeginReceive(BuoyStack stack, ConveyorBuoyGroup group, int baseIndex, Action completed, float? duration = null, float? delay = null)
 public void Begin(BuoyStack stack, Vector2Int outlet, BuoyStackHolder sourceHolder, Action completed)
 public void Tick(float deltaTime, float speed, float interval)
 private static void LaunchReceiveFlights(ReceiveTransfer transfer)
@@ -963,10 +1135,12 @@ class LevelDataSO {
     -BoardData board
     -PathData path
     -List~BuoyNodeData~ buoyNodes
+    -int maxStackInStackQueue
     +ColorDataSO ColorData
     +BoardData Board
     +PathData Path
     +IReadOnlyList~BuoyNodeData~ BuoyNodes
+    +int MaxStackInStackQueue
 }
 ScriptableObject <|-- LevelDataSO
 class BoardData {
@@ -1003,6 +1177,7 @@ class BuoyColumnData {
     +IReadOnlyList~ColumnElementData~ Elements
     +IReadOnlyList~BuoyData~ Buoys
     +int BuoyCount
+    +CreateEmpty() BuoyColumnData$
     -CreateDefaultBuoys() List~BuoyData~$
 }
 class BuoyData {
@@ -1074,10 +1249,13 @@ private BoardData board = new BoardData();
 private PathData path = new PathData();
 [SerializeField]
 private List<BuoyNodeData> buoyNodes = new List<BuoyNodeData>();
+[SerializeField, Min(1)]
+private int maxStackInStackQueue = 3;
 public ColorDataSO ColorData => colorData;
 public BoardData Board => board;
 public PathData Path => path;
 public IReadOnlyList<BuoyNodeData> BuoyNodes => buoyNodes;
+public int MaxStackInStackQueue => Mathf.Max(1, maxStackInStackQueue);
 ```
 
 ### BoardData
@@ -1145,6 +1323,7 @@ public int ColumnTypeCount => columnTypeCount;
 public IReadOnlyList<ColumnElementData> Elements => elements;
 public IReadOnlyList<BuoyData> Buoys => buoys;
 public int BuoyCount => buoys.Count;
+public static BuoyColumnData CreateEmpty()
 private static List<BuoyData> CreateDefaultBuoys()
 ```
 
@@ -1349,8 +1528,12 @@ public List<Vector3> data;
 - Holder VisibleCapacity and decorations are fixed at initialization. Only visible stacks are spawned; pending columns remain data.
 - The empty front stack is disabled after its outgoing transfer completes. The rear stack tweens forward while the replacement appears in the rear slot. Only the front accepts input and groups.
 - The holder root trigger detects a group using Enter/Stay. Group detection uses a trigger sphere and kinematic Rigidbody.
-- Matching loaded groups are claimed with IsReceiving and continue moving while overlapping flights launch to reserved stack indices. Landings commit in order. BuoyReceiveConfig controls flight duration and launch delay; each transfer snapshots its timing settings.
+- Matching loaded groups are claimed with IsReceiving and continue moving while overlapping flights launch to reserved stack indices. Landings commit in order. Serialized fields on LevelManager (holder receiving) and StackQueueVisual (queue receiving) control flight duration and launch delay; each transfer snapshots its timing settings.
 - DepartureHolder prevents immediate return to the source until its trigger volume has been left.
+- StackQueue initializes LevelDataSO.MaxStackInStackQueue empty stacks, centered on its spawn root along local X. It chooses the first empty or same-color stack without a buoy limit.
+- Queue reservations claim colors and landing indices immediately; overlapping same-color transfers commit in global stack order.
+- Open conveyors notify ReachedEnd once per loaded group. StackQueueExit provides a configurable trigger for open or closed paths. Accepted queue groups release path occupancy immediately and launch from the exit.
+- No eligible queue stack triggers LevelManager.HasLost/Lost once and pauses input, conveyor and transfers. Consume is not implemented.
 - Reset cancels queue tweens and clears flying buoys before destroying stacks/groups.
 
 ## Web viewing

@@ -11,11 +11,13 @@ namespace WaterConveyorSort.LevelData
         [SerializeField] private BoardData board = new BoardData();
         [SerializeField] private PathData path = new PathData();
         [SerializeField] private List<BuoyNodeData> buoyNodes = new List<BuoyNodeData>();
+        [SerializeField, Min(1)] private int maxStackInStackQueue = 3;
 
         public ColorDataSO ColorData => colorData;
         public BoardData Board => board;
         public PathData Path => path;
         public IReadOnlyList<BuoyNodeData> BuoyNodes => buoyNodes;
+        public int MaxStackInStackQueue => Mathf.Max(1, maxStackInStackQueue);
     }
 
     [Serializable]
@@ -77,6 +79,7 @@ namespace WaterConveyorSort.LevelData
         public IReadOnlyList<ColumnElementData> Elements => elements;
         public IReadOnlyList<BuoyData> Buoys => buoys;
         public int BuoyCount => buoys.Count;
+        public static BuoyColumnData CreateEmpty() => new BuoyColumnData { buoys = new List<BuoyData>() };
 
         private static List<BuoyData> CreateDefaultBuoys()
         {

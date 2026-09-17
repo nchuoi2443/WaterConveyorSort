@@ -10,6 +10,12 @@ namespace WaterConveyorSort.LevelEditorTools
     {
         private readonly SerializedObject serialized;
         public LevelDataWriter(SerializedObject serialized) { this.serialized = serialized; }
+        public void SaveMaxStackInStackQueue(int count)
+        {
+            serialized.Update();
+            serialized.FindProperty("maxStackInStackQueue").intValue = Mathf.Max(1, count);
+            Commit("Edit Stack Queue Capacity");
+        }
 
         public void SaveBoard(int width, int height, float cellSize)
         {

@@ -119,13 +119,22 @@ def main():
     records = [record for path in sources for record in parse_types(path)]
     relations = """LevelManager --> LevelDataSO : reads
 LevelManager --> BoardManager : initializes
-LevelManager --> BuoyReceiveConfig : receive settings
-BoardManager --> BuoyReceiveConfig
-BuoyTransferController --> BuoyReceiveConfig : snapshot timing
 LevelManager --> ConveyorController : configures
 BoardManager *-- BuoyStackHolderController
 BoardManager *-- BuoyTransferController : ticks flights
 BoardManager --> ConveyorController
+BoardManager *-- StackQueueController
+BoardManager --> StackQueueVisual
+BoardManager --> StackQueueExit
+LevelManager --> StackQueueVisual
+LevelManager --> StackQueueExit
+LevelManager --> BoardManager : queue failure to Lost
+StackQueueController *-- BuoyStack : queue contents
+StackQueueController *-- StackReservation
+StackQueueController --> StackQueueVisual
+StackQueueController --> ConveyorController : detach at exit
+StackQueueController --> BuoyTransferController : reserved landings
+StackQueueExit --> StackQueueController : trigger entry
 BuoyStackHolderController *-- BuoyStackHolder
 BuoyStackHolderController ..> BuoyStack : lazy factory
 BuoyStackHolder *-- BuoyStack : visible slots
@@ -174,7 +183,8 @@ Outline *-- ListVector3""".splitlines()
         ("Board", "Level, board and input", {"LevelManager", "BoardManager", "BoardCoordinates", "InputSystem", "IInputReceiver"}),
         ("Buoys", "Buoys, stacks and holders", {"Buoy", "BuoyStack", "BuoyStackHolder", "BuoyStackHolderController", "BuoyStackHolderVisual", "BuoyStackVisual", "BuoyVisual", "BuoyColorConfig", "ColorMaterialEntry"}),
         ("Conveyor", "Conveyor", {"ConveyorController", "ConveyorBuilder", "ConveyorBuoyGroup", "PathMoveSlot", "GroupPosition", "EnterRequest"}),
-        ("Transfer", "Transfers", {"BuoyTransferController", "Transfer", "ReceiveTransfer", "ReceiveFlight", "Flight", "BuoyReceiveConfig"}),
+        ("StackQueue", "Stack queue and exit", {"StackQueueController", "StackQueueVisual", "StackQueueExit", "StackReservation"}),
+        ("Transfer", "Transfers", {"BuoyTransferController", "Transfer", "ReceiveTransfer", "ReceiveFlight", "Flight"}),
         ("Data", "Level data and enums", {"LevelDataSO", "BoardData", "PathData", "BuoyNodeData", "BuoyColumnData", "BuoyData", "ColumnElementData", "BuoyElementData", "ColorDataSO", "ColorEntryData", "ColumnElementType", "BuoyElementType"}),
         ("Outline", "QuickOutline", {"Outline", "ListVector3", "Mode"}),
     ]
@@ -199,7 +209,7 @@ Outline *-- ListVector3""".splitlines()
                     signatures.append(attributes)
                 signatures.append(signature + (member[3] if len(member) > 3 else ""))
             markdown.append("\n```csharp\n" + "\n".join(signatures) + "\n```")
-    markdown.extend(["\n## Current behavior", "\n- Holder VisibleCapacity and decorations are fixed at initialization. Only visible stacks are spawned; pending columns remain data.\n- The empty front stack is disabled after its outgoing transfer completes. The rear stack tweens forward while the replacement appears in the rear slot. Only the front accepts input and groups.\n- The holder root trigger detects a group using Enter/Stay. Group detection uses a trigger sphere and kinematic Rigidbody.\n- Matching loaded groups are claimed with IsReceiving and continue moving while overlapping flights launch to reserved stack indices. Landings commit in order. BuoyReceiveConfig controls flight duration and launch delay; each transfer snapshots its timing settings.\n- DepartureHolder prevents immediate return to the source until its trigger volume has been left.\n- Reset cancels queue tweens and clears flying buoys before destroying stacks/groups.",
+    markdown.extend(["\n## Current behavior", "\n- Holder VisibleCapacity and decorations are fixed at initialization. Only visible stacks are spawned; pending columns remain data.\n- The empty front stack is disabled after its outgoing transfer completes. The rear stack tweens forward while the replacement appears in the rear slot. Only the front accepts input and groups.\n- The holder root trigger detects a group using Enter/Stay. Group detection uses a trigger sphere and kinematic Rigidbody.\n- Matching loaded groups are claimed with IsReceiving and continue moving while overlapping flights launch to reserved stack indices. Landings commit in order. Serialized fields on LevelManager (holder receiving) and StackQueueVisual (queue receiving) control flight duration and launch delay; each transfer snapshots its timing settings.\n- DepartureHolder prevents immediate return to the source until its trigger volume has been left.\n- StackQueue initializes LevelDataSO.MaxStackInStackQueue empty stacks, centered on its spawn root along local X. It chooses the first empty or same-color stack without a buoy limit.\n- Queue reservations claim colors and landing indices immediately; overlapping same-color transfers commit in global stack order.\n- Open conveyors notify ReachedEnd once per loaded group. StackQueueExit provides a configurable trigger for open or closed paths. Accepted queue groups release path occupancy immediately and launch from the exit.\n- No eligible queue stack triggers LevelManager.HasLost/Lost once and pauses input, conveyor and transfers. Consume is not implemented.\n- Reset cancels queue tweens and clears flying buoys before destroying stacks/groups.",
                      "\n## Web viewing", "\nOpen [ClassDiagram-Web.html](ClassDiagram-Web.html). Choose a subsystem diagram to reduce layout cost. Import any `.mmd` file into Mermaid-compatible tools. Regenerate with `python Docs/Tools/GenerateClassDiagram.py`."])
     (DOCS / "ClassDiagram.md").write_text("\n".join(markdown) + "\n", encoding="utf-8")
     buttons = []

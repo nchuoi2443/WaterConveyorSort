@@ -59,6 +59,7 @@ namespace WaterConveyorSort.BoardSystem.Buoys
 
         internal bool ContainsGroup(ConveyorBuoyGroup group) => !cleared && visual != null && visual.ContainsGroup(group);
         internal bool CanReceive(ConveyorBuoyGroup group) => !cleared && !busy && transfer != null &&
+            !transfer.IsPaused &&
             OutletDirection != Vector2Int.zero && ActiveStack != null && ActiveStack.Buoys.Count > 0 &&
             group != null && group.IsLoaded && !group.IsReceiving && group.DepartureHolder != this &&
             group.HasColor(ActiveStack.Buoys[ActiveStack.Buoys.Count - 1].ColorCode);
@@ -80,7 +81,7 @@ namespace WaterConveyorSort.BoardSystem.Buoys
 
         private void OnStackClicked(BuoyStack stack)
         {
-            if (cleared || busy || stack != ActiveStack || transfer == null) return;
+            if (cleared || busy || stack != ActiveStack || transfer == null || transfer.IsPaused) return;
             busy = true;
             RefreshInput();
             try { transfer.Begin(stack, OutletCell, this, FinishTransfer); }

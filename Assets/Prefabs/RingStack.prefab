@@ -195,6 +195,7 @@ MonoBehaviour:
   firstBuoyOffset: {x: 0, y: 0, z: 0}
   buoySpacing: 0
   buoyHeight: 0.2
+  emptyStackHeight: 2
   poleTransform: {fileID: 4846112679617301856}
   inputColliders:
   - {fileID: 8188284399684651852}

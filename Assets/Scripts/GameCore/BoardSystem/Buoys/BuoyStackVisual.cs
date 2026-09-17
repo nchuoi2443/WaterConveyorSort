@@ -10,6 +10,8 @@ namespace WaterConveyorSort.BoardSystem.Buoys
         [SerializeField] private Vector3 firstBuoyOffset = new Vector3(0f, 0.2f, 0f);
         [SerializeField, Min(0f)] private float buoySpacing = 0f;
         [SerializeField, Min(0.01f)] private float buoyHeight = 0.2f;
+        [Tooltip("Pole height in stack-local units when there are no buoys. Zero hides the empty pole.")]
+        [SerializeField, Min(0f)] private float emptyStackHeight = 0.2f;
         [SerializeField] private Transform poleTransform;
         public float Step => buoyHeight + buoySpacing;
         private Vector3 poleScale, polePosition;
@@ -29,7 +31,7 @@ namespace WaterConveyorSort.BoardSystem.Buoys
         public void RefreshHeight(int buoyCount)
         {
             count = buoyCount;
-            float height = count > 0 ? buoyHeight * count + buoySpacing * (count - 1) : 0f;
+            float height = count > 0 ? buoyHeight * count + buoySpacing * (count - 1) : Mathf.Max(0f, emptyStackHeight);
             if (poleTransform != null)
             {
                 if (!poleCached)
@@ -43,7 +45,7 @@ namespace WaterConveyorSort.BoardSystem.Buoys
                         poleCached = true;
                     }
                 }
-                poleTransform.gameObject.SetActive(count > 0);
+                poleTransform.gameObject.SetActive(height > 0f);
                 if (poleCached && height > 0f && poleBounds.size.y > 0f)
                 {
                     Vector3 scale = poleScale;
@@ -92,6 +94,10 @@ namespace WaterConveyorSort.BoardSystem.Buoys
 
         private void OnEnable() => RegisterInput();
         private void OnDisable() => UnregisterInput();
+        private void OnValidate()
+        {
+            if (Application.isPlaying && !released) RefreshHeight(count);
+        }
 
         private void RegisterInput()
         {

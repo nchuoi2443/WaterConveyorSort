@@ -10,16 +10,26 @@ class BoardManager {
     -BuoyStackVisual buoyStackPrefab
     -BuoyStackHolderVisual buoyStackHolderPrefab
     -InputSystem inputSystem
+    -StackQueueVisual stackQueueVisual
+    -StackQueueExit stackQueueExit
+    -StackQueueController stackQueue
+    +StackQueueController StackQueue
+    +Action StackQueueFull
+    +ConfigureStackQueue(StackQueueVisual visual, StackQueueExit exit) void
+    +SetPaused(bool paused) void
+    -OnQueueFull() void
+    -OnConveyorEnd(ConveyorBuoyGroup group) void
     -float transferSpeed
     -float launchInterval
-    -BuoyReceiveConfig receiveConfig
-    +SetReceiveConfig(BuoyReceiveConfig config) void
+    -float receiveFlightDuration
+    -float receiveLaunchDelay
+    +SetReceiveSettings(float duration, float delay) void
     +Configure(Transform root, ConveyorController conveyor, InputSystem input, BuoyVisual buoy, BuoyStackVisual stack, BuoyStackHolderVisual holder) void
     +SetMotionSettings(float speed, float interval) void
     -BuoyTransferController transfers
     -LateUpdate() void
     -BuoyStackHolderController buoyStackHolderController
-    +InitBoard(BoardData boardData, PathData pathData, IReadOnlyList~BuoyNodeData~ nodes, ColorDataSO colors) void
+    +InitBoard(BoardData boardData, PathData pathData, IReadOnlyList~BuoyNodeData~ nodes, ColorDataSO colors, int maxStackInStackQueue = 3) void
     -OnDestroy() void
 }
 MonoBehaviour <|-- BoardManager
@@ -59,7 +69,14 @@ class LevelManager {
     -float conveyorGroupGap
     -float transferSpeed
     -float launchInterval
-    -BuoyReceiveConfig receiveConfig
+    -float receiveFlightDuration
+    -float receiveLaunchDelay
+    -StackQueueVisual stackQueueVisual
+    -StackQueueExit stackQueueExit
+    +bool HasLost
+    +Action Lost
+    -OnStackQueueFull() void
+    -OnDestroy() void
     -OnValidate() void
     -ApplyMotionSettings() void
     -Start() void
@@ -67,4 +84,5 @@ class LevelManager {
 }
 MonoBehaviour <|-- LevelManager
 LevelManager --> BoardManager : initializes
+LevelManager --> BoardManager : queue failure to Lost
 InputSystem --> IInputReceiver : dispatches clicks

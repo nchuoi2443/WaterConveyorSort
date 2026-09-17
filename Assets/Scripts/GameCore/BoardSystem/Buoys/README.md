@@ -67,7 +67,7 @@ The root trigger collider on StackHolder.prefab is assigned as Receive Collider.
 
 OnTriggerEnter and OnTriggerStay check the active stack's top color. Only fully loaded, unclaimed groups with matching color are accepted. Empty, busy and unconfigured holders do not receive. Stay allows a group that finishes loading or encounters a holder finishing its tween within the volume to be checked again. Only the front stack receives, not the waiting rear stack.
 
-Accepted groups keep moving. The transfer launches overlapping flights from the group's top using BuoyReceiveConfig Launch Delay and Flight Duration, reserving destination indices and committing landings in order. Unlaunched buoys remain parented to the moving group. IsReceiving claims the group so other holders cannot receive it, even after it leaves the trigger. The empty group keeps moving until all flights land, then its conveyor reservation and GameObject are removed. The destination unlocks after completion.
+Accepted groups keep moving. The transfer launches overlapping flights from the group's top using LevelManager Receive Launch Delay and Receive Flight Duration, reserving destination indices and committing landings in order. Unlaunched buoys remain parented to the moving group. IsReceiving claims the group so other holders cannot receive it, even after it leaves the trigger. The empty group keeps moving until all flights land, then its conveyor reservation and GameObject are removed. The destination unlocks after completion.
 
 DepartureHolder prevents a freshly exported group from immediately returning to its source; this exclusion clears once the group leaves the source trigger volume. Reset clears all unlanded flights before stacks and groups are destroyed.
 
@@ -89,7 +89,7 @@ ConveyorController projects the holder's OutletCell (GridPosition + OutletDirect
 
 Each tap reserves one group and one slot per buoy, in top-to-bottom launch order. The group stays still until slot zero receives its buoy, then starts moving immediately. Flights chase the current world position of their slot every frame. Parent changes only on arrival. Buoys in flight belong to the transfer controller; source roots stay alive and stationary until the transfer completes. On reset, flights are cleared before source stacks and conveyor groups.
 
-Buoy Height is 0.2 and Buoy Spacing is 0 on RingStack.prefab to preserve its previous 0.2 placement step. Adjust these to the authored mesh dimensions. Pole Transform references Stick. Its mesh bounds determine scaling while preserving the original base. Height is count * buoyHeight + max(0, count - 1) * spacing; empty poles are hidden. Capsule height follows the stack but cannot shrink below its diameter. Queue advancement uses the fixed visual slots and coroutine tween described above.
+Buoy Height is 0.2 and Buoy Spacing is 0 on RingStack.prefab to preserve its previous 0.2 placement step. Adjust these to the authored mesh dimensions. Pole Transform references Stick. Its mesh bounds determine scaling while preserving the original base. Height is count * buoyHeight + max(0, count - 1) * spacing; empty poles use the prefab's Empty Stack Height (default 0.2 stack-local units; zero hides them). Capsule height follows the stack but cannot shrink below its diameter. Queue advancement uses the fixed visual slots and coroutine tween described above.
 
 Manual verification:
 - Top-to-bottom red/red/blue/red: one tap exports only the first two reds into one group.
@@ -110,8 +110,30 @@ Entry requests preserve arrival order within overlapping entry regions; blocked 
 
 Verify simultaneous holder taps, a blocked entry, a loading group with followers, a full moving loop, zero speed, and reinitialization with pending requests in Play Mode. Waiting for space intentionally keeps the source locked. Conveyor-to-stack completion releases the group reservation and its GameObject.
 
-## Receive timing config
+## Receive timing fields
 
-Assets/Settings/BuoyReceiveConfig.asset is assigned to SampleScene's LevelManager under Conveyor To Stack / Receive Config. Flight Duration defaults to 0.4 seconds; Launch Delay defaults to 0.12 seconds. The first buoy launches immediately; buoy i launches at i * Launch Delay and lands at that time plus Flight Duration. Zero delay launches all buoys together. Receive flights interpolate from their launch position to the stack position over the configured duration, independent of travel distance and outgoing Transfer Speed.
+Configure holder receiving directly on LevelManager under Conveyor To Stack: Receive Flight Duration defaults to 0.4 seconds and Receive Launch Delay defaults to 0.12 seconds. Queue receiving has its own fields on StackQueueVisual, with the same defaults. No config ScriptableObjects are required. The first buoy launches immediately; buoy i launches at i * delay and lands after its flight duration. Zero delay launches the entire group together. Each transfer copies timing at startup, so Inspector edits apply to subsequent groups.
 
-Timing is copied at the start of each receive transfer, so config edits apply to subsequent groups. If no asset is assigned, duration/delay default to 0.4/0.12 seconds. Create additional configs from Create > Water Conveyor Sort > Buoy Receive Config and assign them on LevelManager. Stack-to-conveyor flight speed and launch interval remain on LevelManager's Transfer Setup.
+## Stack queue at conveyor exit
+
+LevelDataSO.MaxStackInStackQueue sets the number of initially empty queue stacks (default 3). The level asset's custom inspector exposes this in Stack Queue / Max Stack In Stack Queue. There is no per-stack buoy limit and no consume logic yet.
+
+SampleScene includes StackQueue and StackQueueExit under the board root. StackQueue has a separate StackQueueSpawnRoot centered on the row. StackQueueVisual exposes Stack Spacing, Receive Flight Duration and Receive Launch Delay as serialized fields. Spacing is measured center-to-center along the spawn root's local X. With N stacks, stack i uses x = (i - (N - 1) * 0.5) * spacing. Move/rotate the root to position the entire row. Queue stacks have click input disabled and retain a short visible pole while empty.
+
+StackQueueExit is a root trigger collider; place it at the desired exit for a closed conveyor, or near the final cell for an open conveyor. OnTriggerStay also handles groups that finish loading while still in the exit. Open paths additionally send a ReachedEnd notification when a loaded, unclaimed group reaches the end, so endpoint handling does not depend on trigger sampling. The current backward path ends at PathData.Cells[0]. The SampleScene exit is placed near that cell for LevelDataTest; moving the level path requires moving the exit trigger too. Keep exit and holder receiving volumes separate.
+
+Selection scans queue stacks from index 0. An empty stack accepts any group; a non-empty stack accepts its own color. The first eligible stack wins, even when a later stack matches the color and an earlier one is empty. A reservation counts as occupied before any buoy lands. Groups of another color cannot claim that reservation; same-color groups append their own distinct landing indices and can fly concurrently. The transfer scheduler commits all landings in global stack order.
+
+Accepted queue groups are detached from path occupancy immediately and stop at the exit while their buoys fly to the destination; the GameObject is removed after all landings. Groups already received by a board holder are not selected again. When no stack is eligible, queue failure is raised once. BoardManager pauses input, conveyor and transfers; LevelManager sets HasLost and raises Lost for future UI integration. Reinitializing the level clears reservations and resumes gameplay.
+
+Verify in Play Mode:
+- Change Max Stack In Stack Queue and confirm the number of empty stacks and centered spacing.
+- Receive red, blue and red groups; fill stack 0 red, stack 1 blue, then append to stack 0.
+- With an empty earlier stack and a later matching stack, choose the earlier empty one.
+- Send different colors before prior flights land; reserve separate stacks, never mix colors.
+- Send same-color groups with different receive timing values; commit without overlapping slots.
+- Fill every stack with a different color, then send a new color; trigger Lost once and freeze gameplay.
+- Receive more than five buoys of one color; keep them until consume is implemented later.
+- Reset during multiple queue flights or after a loss; clear all stacks/reservations and resume input.
+
+Empty Stack Height on BuoyStackVisual sets the default pole height only when there are no buoys. Queue spawning uses this prefab value directly. Once buoys land, pole height follows buoy count and spacing. Changing the value in Play Mode refreshes the visual; empty stacks remain non-clickable.

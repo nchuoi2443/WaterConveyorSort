@@ -1,22 +1,19 @@
 classDiagram
 direction LR
-class BuoyReceiveConfig {
-    -float flightDuration
-    -float launchDelay
-    +float FlightDuration
-    +float LaunchDelay
-}
-ScriptableObject <|-- BuoyReceiveConfig
 class BuoyTransferController {
     -List~Transfer~ transfers
     -List~ReceiveTransfer~ receives
     -ConveyorController conveyor
     -int generation
     -float flightSpeed
-    -BuoyReceiveConfig receiveConfig
-    +SetReceiveConfig(BuoyReceiveConfig config) void
+    -float receiveFlightDuration
+    -float receiveLaunchDelay
+    +bool IsPaused
+    +SetPaused(bool paused) void
+    +SetReceiveSettings(float duration, float delay) void
     +BuoyTransferController(ConveyorController conveyor)
     ~BeginReceive(BuoyStack stack, ConveyorBuoyGroup group, Action completed) void
+    ~BeginReceive(BuoyStack stack, ConveyorBuoyGroup group, int baseIndex, Action completed, float? duration = null, float? delay = null) void
     +Begin(BuoyStack stack, Vector2Int outlet, BuoyStackHolder sourceHolder, Action completed) void
     +Tick(float deltaTime, float speed, float interval) void
     -LaunchReceiveFlights(ReceiveTransfer transfer) void$
@@ -52,7 +49,6 @@ class Flight {
     +int Slot
     +bool Arrived
 }
-BuoyTransferController --> BuoyReceiveConfig : snapshot timing
 BuoyTransferController *-- Transfer
 BuoyTransferController *-- ReceiveTransfer
 Transfer *-- Flight

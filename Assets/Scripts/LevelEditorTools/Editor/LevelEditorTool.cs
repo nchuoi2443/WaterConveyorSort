@@ -49,6 +49,11 @@ namespace WaterConveyorSort.LevelEditorTools
             colorData = level.ColorData;
             DrawBoardSettings(level);
             EditorGUILayout.Space();
+            EditorGUILayout.LabelField("Stack Queue", EditorStyles.boldLabel);
+            EditorGUI.BeginChangeCheck();
+            int queueCount = EditorGUILayout.DelayedIntField("Max Stack In Stack Queue", level.MaxStackInStackQueue);
+            if (EditorGUI.EndChangeCheck()) writer.SaveMaxStackInStackQueue(Mathf.Max(1, queueCount));
+            EditorGUILayout.Space();
             DrawToolbar(level);
 
             IReadOnlyList<Vector2Int> cells = draft.IsEditing ? draft.Cells : level.Path.Cells;

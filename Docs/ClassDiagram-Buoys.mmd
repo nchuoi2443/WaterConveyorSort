@@ -108,6 +108,7 @@ class BuoyStackVisual {
     -Vector3 firstBuoyOffset
     -float buoySpacing
     -float buoyHeight
+    -float emptyStackHeight
     -Transform poleTransform
     +float Step
     -Vector3 poleScale, polePosition
@@ -125,6 +126,7 @@ class BuoyStackVisual {
     +OnClick() void
     -OnEnable() void
     -OnDisable() void
+    -OnValidate() void
     -RegisterInput() void
     -UnregisterInput() void
     +GetBuoyPosition(int index) Vector3

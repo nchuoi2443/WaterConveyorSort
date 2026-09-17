@@ -5,10 +5,12 @@ class LevelDataSO {
     -BoardData board
     -PathData path
     -List~BuoyNodeData~ buoyNodes
+    -int maxStackInStackQueue
     +ColorDataSO ColorData
     +BoardData Board
     +PathData Path
     +IReadOnlyList~BuoyNodeData~ BuoyNodes
+    +int MaxStackInStackQueue
 }
 ScriptableObject <|-- LevelDataSO
 class BoardData {
@@ -45,6 +47,7 @@ class BuoyColumnData {
     +IReadOnlyList~ColumnElementData~ Elements
     +IReadOnlyList~BuoyData~ Buoys
     +int BuoyCount
+    +CreateEmpty() BuoyColumnData$
     -CreateDefaultBuoys() List~BuoyData~$
 }
 class BuoyData {

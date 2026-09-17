@@ -6,6 +6,7 @@ using WaterConveyorSort.InputHandling;
 using UnityEngine;
 using WaterConveyorSort.BoardSystem;
 using WaterConveyorSort.LevelData;
+using WaterConveyorSort.BoardSystem.StackQueue;
 
 namespace WaterConveyorSort.LevelSystem
 {
@@ -33,7 +34,25 @@ namespace WaterConveyorSort.LevelSystem
         [SerializeField, Min(0.01f)] private float transferSpeed = 4f;
         [SerializeField, Min(0f)] private float launchInterval = 0.12f;
         [Header("Conveyor To Stack")]
-        [SerializeField] private BuoyReceiveConfig receiveConfig;
+        [SerializeField, Min(0.01f)] private float receiveFlightDuration = 0.4f;
+        [SerializeField, Min(0f)] private float receiveLaunchDelay = 0.12f;
+        [Header("Stack Queue")]
+        [SerializeField] private StackQueueVisual stackQueueVisual;
+        [SerializeField] private StackQueueExit stackQueueExit;
+        public bool HasLost { get; private set; }
+        public event Action Lost;
+        private void OnStackQueueFull()
+        {
+            if (HasLost) return;
+            HasLost = true;
+            boardManager.SetPaused(true);
+            Debug.Log("Level lost: no stack in StackQueue can receive the group.", this);
+            Lost?.Invoke();
+        }
+        private void OnDestroy()
+        {
+            if (boardManager != null) boardManager.StackQueueFull -= OnStackQueueFull;
+        }
 
         private void OnValidate()
         {
@@ -44,7 +63,7 @@ namespace WaterConveyorSort.LevelSystem
         private void ApplyMotionSettings()
         {
             if (boardManager != null) boardManager.SetMotionSettings(transferSpeed, launchInterval);
-            if (boardManager != null) boardManager.SetReceiveConfig(receiveConfig);
+            if (boardManager != null) boardManager.SetReceiveSettings(receiveFlightDuration, receiveLaunchDelay);
             if (conveyorController != null) conveyorController.SetMotionSettings(moveSpeed, rootYOffset);
         }
 
@@ -67,8 +86,13 @@ namespace WaterConveyorSort.LevelSystem
             conveyorController.Configure(splineComputer, splineMesh);
             conveyorController.ConfigurePathSlots(pathMoveSlotSpacing, conveyorGroupGap);
             boardManager.Configure(boardRoot, conveyorController, inputSystem, buoyPrefab, buoyStackPrefab, buoyStackHolderPrefab);
+            boardManager.ConfigureStackQueue(stackQueueVisual, stackQueueExit);
+            boardManager.StackQueueFull -= OnStackQueueFull;
+            boardManager.StackQueueFull += OnStackQueueFull;
+            HasLost = false;
             ApplyMotionSettings();
-            boardManager.InitBoard(levelData.Board, levelData.Path, levelData.BuoyNodes, levelData.ColorData);
+            boardManager.InitBoard(levelData.Board, levelData.Path, levelData.BuoyNodes, levelData.ColorData,
+                levelData.MaxStackInStackQueue);
         }
     }
 }

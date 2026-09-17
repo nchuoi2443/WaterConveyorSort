@@ -201,3 +201,4 @@ MonoBehaviour:
         buoyType: 0
         buoyTypeCount: 0
         elements: []
+  maxStackInStackQueue: 5
