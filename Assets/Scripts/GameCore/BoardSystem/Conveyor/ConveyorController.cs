@@ -88,6 +88,15 @@ namespace WaterConveyorSort.BoardSystem.Conveyor
             waiting.Add(new EnterRequest { Distance = closed ? Mathf.Repeat(_pathMoveSlots[nearest].Distance, length) : _pathMoveSlots[nearest].Distance, Spacing = spacing, EstimateArrival = estimateArrival, Accepted = accepted });
         }
 
+        public void RequestQueueEntry(float spacing, Func<Vector3, float> estimateArrival, Action<ConveyorBuoyGroup> accepted)
+        {
+            if (_pathMoveSlots.Count < 2 || length < groupGap)
+                throw new InvalidOperationException("Conveyor path is too short for the configured group gap.");
+            // The last authored path node is the start of backward conveyor movement.
+            waiting.Add(new EnterRequest { Distance = 0f, Spacing = spacing,
+                EstimateArrival = estimateArrival, Accepted = accepted });
+        }
+
         private void ProcessEntries()
         {
             // Independent entry points can proceed; overlapping requests retain arrival order.

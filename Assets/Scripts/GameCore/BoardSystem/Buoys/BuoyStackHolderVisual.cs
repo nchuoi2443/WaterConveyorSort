@@ -38,7 +38,9 @@ namespace WaterConveyorSort.BoardSystem.Buoys
                 throw new InvalidOperationException("Holder requires a trigger collider on its root.");
         }
 
-        internal bool ContainsGroup(ConveyorBuoyGroup group) => receiveCollider != null &&
+        public void SetVisible(bool visible) => gameObject.SetActive(visible);
+
+        internal bool ContainsGroup(ConveyorBuoyGroup group) => gameObject.activeInHierarchy && receiveCollider != null &&
             receiveCollider.enabled && (receiveCollider.ClosestPoint(group.transform.position) - group.transform.position)
             .sqrMagnitude <= group.DetectionRadius * group.DetectionRadius;
 

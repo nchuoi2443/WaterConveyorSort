@@ -40,15 +40,27 @@ namespace WaterConveyorSort.BoardSystem.Buoys
         }
         public void Begin(BuoyStack stack, Vector2Int outlet, BuoyStackHolder sourceHolder, Action completed)
         {
+            BeginExport(stack, sourceHolder, completed, (spacing, estimate, accepted) =>
+                conveyor.RequestEntry(outlet, spacing, estimate, accepted));
+        }
+        internal void BeginFromQueue(BuoyStack stack, Action completed, Action<ConveyorBuoyGroup> departing)
+        {
+            BeginExport(stack, null, completed, conveyor.RequestQueueEntry, departing);
+        }
+        private void BeginExport(BuoyStack stack, BuoyStackHolder sourceHolder, Action completed,
+            Action<float, Func<Vector3, float>, Action<ConveyorBuoyGroup>> requestEntry,
+            Action<ConveyorBuoyGroup> departing = null)
+        {
             List<Buoy> selected = stack.GetTopGroup();
             if (selected.Count == 0) { completed(); return; }
             int requestGeneration = generation;
-            conveyor.RequestEntry(outlet, stack.Visual.Step,
+            requestEntry(stack.Visual.Step,
                 target => Vector3.Distance(selected[0].Visual.transform.position, target) /
                     Mathf.Max(flightSpeed, conveyor.MoveSpeed + 0.5f), group =>
             {
                 if (generation != requestGeneration) return;
                 group.DepartureHolder = sourceHolder;
+                departing?.Invoke(group);
                 transfers.Add(new Transfer { Stack = stack, Selected = selected, Group = group, Completed = completed,
                     ExpectedArrival = Vector3.Distance(selected[0].Visual.transform.position, group.GetSlotPosition(0)) /
                         Mathf.Max(flightSpeed, conveyor.MoveSpeed + 0.5f) });
@@ -74,8 +86,6 @@ namespace WaterConveyorSort.BoardSystem.Buoys
                 {
                     if (flight.Arrived) continue;
                     Vector3 target = transfer.Group.GetSlotPosition(flight.Slot);
-                    // Keep later buoys on their source until the first buoy has safely joined.
-                    if (flight.Slot > 0 && !transfer.Group.Moving) continue;
                     bool canJoin = flight.Slot > 0 || conveyor.CanReceiveFirst(transfer.Group);
                     if (!canJoin && transfer.Elapsed >= transfer.ExpectedArrival)
                     {

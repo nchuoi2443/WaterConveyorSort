@@ -26,8 +26,12 @@ LevelManager --> BoardManager : queue failure to Lost
 StackQueueController *-- BuoyStack : queue contents
 StackQueueController *-- StackReservation
 StackQueueController --> StackQueueVisual
-StackQueueController --> ConveyorController : detach at exit
-StackQueueController --> BuoyTransferController : reserved landings
+StackQueueController --> ConveyorController : exit and reentry
+StackQueueController --> BuoyTransferController : receive and export
+StackQueueController --> InputSystem : bind queue taps
+StackQueueController --> StackQueueExit : departure guard
+StackReservation *-- PendingReceive
+ConveyorBuoyGroup --> StackQueueExit : DepartureExit
 StackQueueExit --> StackQueueController : trigger entry
 BuoyStackHolderController *-- BuoyStackHolder
 BuoyStackHolderController ..> BuoyStack : lazy factory
@@ -407,6 +411,7 @@ class BuoyStackHolderVisual {
     -BuoyStackHolder owner
     -Coroutine advanceTween
     +Initialize(BuoyStackHolder holder, int visibleCapacity) void
+    +SetVisible(bool visible) void
     ~ContainsGroup(ConveyorBuoyGroup group) bool
     -OnTriggerEnter(Collider other) void
     -OnTriggerStay(Collider other) void
@@ -609,6 +614,7 @@ private float advanceDuration = 0.3f;
 private BuoyStackHolder owner;
 private Coroutine advanceTween;
 public void Initialize(BuoyStackHolder holder, int visibleCapacity)
+public void SetVisible(bool visible)
 internal bool ContainsGroup(ConveyorBuoyGroup group)
 private void OnTriggerEnter(Collider other)
 private void OnTriggerStay(Collider other)
@@ -700,6 +706,7 @@ class ConveyorBuoyGroup {
     ~bool IsLoaded
     ~bool IsReceiving
     ~BuoyStackHolder DepartureHolder
+    ~StackQueueExit DepartureExit
     +float DetectionRadius
     -SphereCollider detectionCollider
     -Rigidbody body
@@ -746,6 +753,7 @@ class ConveyorController {
     ~RemoveGroup(ConveyorBuoyGroup group) void
     +ConfigurePathSlots(float spacing, float minimumGap) void
     +RequestEntry(Vector2Int outletCell, float spacing, Func~Vector3_float~ estimateArrival, Action~ConveyorBuoyGroup~ accepted) void
+    +RequestQueueEntry(float spacing, Func~Vector3_float~ estimateArrival, Action~ConveyorBuoyGroup~ accepted) void
     -ProcessEntries() void
     +CanReceiveFirst(ConveyorBuoyGroup group) bool
     +GetEntryHoldingOffset() Vector3
@@ -817,6 +825,7 @@ internal bool Moving;
 internal bool IsLoaded { get; set; }
 internal bool IsReceiving { get; set; }
 internal BuoyStackHolder DepartureHolder { get; set; }
+internal StackQueueExit DepartureExit { get; set; }
 public float DetectionRadius => detectionCollider != null ? detectionCollider.radius * Mathf.Max(Mathf.Abs(transform.lossyScale.x), Mathf.Abs(transform.lossyScale.y), Mathf.Abs(transform.lossyScale.z)) : 0f;
 private SphereCollider detectionCollider;
 private Rigidbody body;
@@ -867,6 +876,7 @@ internal void DetachGroup(ConveyorBuoyGroup group)
 internal void RemoveGroup(ConveyorBuoyGroup group)
 public void ConfigurePathSlots(float spacing, float minimumGap)
 public void RequestEntry(Vector2Int outletCell, float spacing, Func<Vector3, float> estimateArrival, Action<ConveyorBuoyGroup> accepted)
+public void RequestQueueEntry(float spacing, Func<Vector3, float> estimateArrival, Action<ConveyorBuoyGroup> accepted)
 private void ProcessEntries()
 public bool CanReceiveFirst(ConveyorBuoyGroup group)
 public Vector3 GetEntryHoldingOffset()
@@ -938,18 +948,31 @@ class StackQueueController {
     -ConveyorController conveyor
     -BuoyTransferController transfers
     -StackQueueVisual visual
+    -InputSystem inputSystem
+    -StackQueueExit exit
     -bool accepting
     -bool failed
     +IReadOnlyList~BuoyStack~ Stacks
     +Action Full
-    +StackQueueController(ConveyorController conveyor, BuoyTransferController transfers, StackQueueVisual visual)
+    +StackQueueController(ConveyorController conveyor, BuoyTransferController transfers, StackQueueVisual visual, InputSystem inputSystem, StackQueueExit exit)
     +Initialize(int count) void
     +SetPaused(bool paused) void
+    -RefreshInput(int index) void
+    -OnStackClicked(BuoyStack stack) void
+    -FinishExport(int index, StackReservation reservation) void
+    -StartReceive(int index, StackReservation reservation, ConveyorBuoyGroup group, int baseIndex) void
     +TryReceive(ConveyorBuoyGroup group) bool
     -FindStack(int color) int
     +Clear() void
 }
+class PendingReceive {
+    +ConveyorBuoyGroup Group
+    +int BaseIndex
+}
 class StackReservation {
+    +bool Outgoing
+    +int Incoming
+    +List~PendingReceive~ Pending
     +int Count
     +int ColorCode
 }
@@ -961,6 +984,7 @@ class StackQueueExit {
     -OnTriggerEnter(Collider other) void
     -OnTriggerStay(Collider other) void
     -DetectGroup(Collider other) void
+    ~ContainsGroup(ConveyorBuoyGroup group) bool
     -OnDrawGizmosSelected() void
 }
 MonoBehaviour <|-- StackQueueExit
@@ -979,6 +1003,8 @@ class StackQueueVisual {
 MonoBehaviour <|-- StackQueueVisual
 StackQueueController *-- StackReservation
 StackQueueController --> StackQueueVisual
+StackQueueController --> StackQueueExit : departure guard
+StackReservation *-- PendingReceive
 StackQueueExit --> StackQueueController : trigger entry
 ```
 
@@ -992,16 +1018,31 @@ private readonly List<StackReservation> reservations = new List<StackReservation
 private readonly ConveyorController conveyor;
 private readonly BuoyTransferController transfers;
 private readonly StackQueueVisual visual;
+private readonly InputSystem inputSystem;
+private readonly StackQueueExit exit;
 private bool accepting;
 private bool failed;
 public IReadOnlyList<BuoyStack> Stacks { get; }
 public event Action Full;
-public StackQueueController(ConveyorController conveyor, BuoyTransferController transfers, StackQueueVisual visual)
+public StackQueueController(ConveyorController conveyor, BuoyTransferController transfers, StackQueueVisual visual, InputSystem inputSystem, StackQueueExit exit)
 public void Initialize(int count)
 public void SetPaused(bool paused)
+private void RefreshInput(int index)
+private void OnStackClicked(BuoyStack stack)
+private void FinishExport(int index, StackReservation reservation)
+private void StartReceive(int index, StackReservation reservation, ConveyorBuoyGroup group, int baseIndex)
 public bool TryReceive(ConveyorBuoyGroup group)
 private int FindStack(int color)
 public void Clear()
+```
+
+### PendingReceive
+
+Source: [Assets/Scripts/GameCore/BoardSystem/StackQueue/StackQueueController.cs](../Assets/Scripts/GameCore/BoardSystem/StackQueue/StackQueueController.cs).
+
+```csharp
+public ConveyorBuoyGroup Group;
+public int BaseIndex;
 ```
 
 ### StackReservation
@@ -1009,6 +1050,9 @@ public void Clear()
 Source: [Assets/Scripts/GameCore/BoardSystem/StackQueue/StackQueueController.cs](../Assets/Scripts/GameCore/BoardSystem/StackQueue/StackQueueController.cs).
 
 ```csharp
+public bool Outgoing;
+public int Incoming;
+public readonly List<PendingReceive> Pending = new List<PendingReceive>();
 public int Count;
 public int ColorCode;
 ```
@@ -1025,6 +1069,7 @@ private void Awake()
 private void OnTriggerEnter(Collider other)
 private void OnTriggerStay(Collider other)
 private void DetectGroup(Collider other)
+internal bool ContainsGroup(ConveyorBuoyGroup group)
 private void OnDrawGizmosSelected()
 ```
 
@@ -1070,6 +1115,8 @@ class BuoyTransferController {
     ~BeginReceive(BuoyStack stack, ConveyorBuoyGroup group, Action completed) void
     ~BeginReceive(BuoyStack stack, ConveyorBuoyGroup group, int baseIndex, Action completed, float? duration = null, float? delay = null) void
     +Begin(BuoyStack stack, Vector2Int outlet, BuoyStackHolder sourceHolder, Action completed) void
+    ~BeginFromQueue(BuoyStack stack, Action completed, Action~ConveyorBuoyGroup~ departing) void
+    -BeginExport(BuoyStack stack, BuoyStackHolder sourceHolder, Action completed, Action~float, Func~Vector3_float~, Action~ConveyorBuoyGroup~~ requestEntry, Action~ConveyorBuoyGroup~ departing = null) void
     +Tick(float deltaTime, float speed, float interval) void
     -LaunchReceiveFlights(ReceiveTransfer transfer) void$
     -TickReceives(float deltaTime) void
@@ -1129,6 +1176,8 @@ public BuoyTransferController(ConveyorController conveyor)
 internal void BeginReceive(BuoyStack stack, ConveyorBuoyGroup group, Action completed)
 internal void BeginReceive(BuoyStack stack, ConveyorBuoyGroup group, int baseIndex, Action completed, float? duration = null, float? delay = null)
 public void Begin(BuoyStack stack, Vector2Int outlet, BuoyStackHolder sourceHolder, Action completed)
+internal void BeginFromQueue(BuoyStack stack, Action completed, Action<ConveyorBuoyGroup> departing)
+private void BeginExport(BuoyStack stack, BuoyStackHolder sourceHolder, Action completed, Action<float, Func<Vector3, float>, Action<ConveyorBuoyGroup>> requestEntry, Action<ConveyorBuoyGroup> departing = null)
 public void Tick(float deltaTime, float speed, float interval)
 private static void LaunchReceiveFlights(ReceiveTransfer transfer)
 private void TickReceives(float deltaTime)
@@ -1614,13 +1663,14 @@ public List<Vector3> data;
 
 ## Current behavior
 
-- Holder VisibleCapacity and decorations are fixed at initialization. Only visible stacks are spawned; pending columns remain data.
+- Holder VisibleCapacity and decorations are fixed at initialization. The entire holder is disabled when no visible stack or pending column remains, after the final export completes. Only visible stacks are spawned; pending columns remain data.
 - The empty front stack is disabled after its outgoing transfer completes. The rear stack tweens forward while the replacement appears in the rear slot. Only the front accepts input and groups.
 - The holder root trigger detects a group using Enter/Stay. Group detection uses a trigger sphere and kinematic Rigidbody.
 - Matching loaded groups are claimed with IsReceiving and continue moving while overlapping flights launch to reserved stack indices. Landings commit in order. Serialized fields on LevelManager (holder receiving) and StackQueueVisual (queue receiving) control flight duration and launch delay; each transfer snapshots its timing settings.
 - DepartureHolder prevents immediate return to the source until its trigger volume has been left.
 - LevelDataSO.MaxBuoyInConveyor limits active conveyor group reservations. MaxBuoyCounterTxt is a separate placed grid node showing current/max; full capacity queues further entry requests.
 - StackQueue initializes LevelDataSO.MaxStackInStackQueue empty stacks, centered on its spawn root along local X. It chooses the first empty or same-color stack without a buoy limit.
+- Queue stacks accept taps after incoming flights finish. A tap exports the top color group to the last authored path node, at the start of backward movement. Export locks taps and reserves vacated slots; incoming flights wait until export finishes. DepartureExit prevents an immediate return while inside the source exit trigger.
 - Queue reservations claim colors and landing indices immediately; overlapping same-color transfers commit in global stack order.
 - Open conveyors notify ReachedEnd once per loaded group. StackQueueExit provides a configurable trigger for open or closed paths. Accepted queue groups release path occupancy immediately and launch from the exit.
 - No eligible queue stack triggers LevelManager.HasLost/Lost once and pauses input, conveyor and transfers. Consume is not implemented.

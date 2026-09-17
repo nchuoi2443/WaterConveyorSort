@@ -125,7 +125,7 @@ namespace WaterConveyorSort.BoardSystem
                 buoyStackHolderPrefab, buoyStackPrefab, buoyPrefab, inputSystem);
             transfers = new BuoyTransferController(conveyorController);
             transfers.SetReceiveSettings(receiveFlightDuration, receiveLaunchDelay);
-            stackQueue = new StackQueueController(conveyorController, transfers, stackQueueVisual);
+            stackQueue = new StackQueueController(conveyorController, transfers, stackQueueVisual, inputSystem, stackQueueExit);
             stackQueue.Initialize(maxStackInStackQueue);
             stackQueue.Full += OnQueueFull;
             stackQueueExit.Initialize(stackQueue);

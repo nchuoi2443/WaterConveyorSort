@@ -1,6 +1,7 @@
 using System.Collections.Generic;
 using UnityEngine;
 using WaterConveyorSort.BoardSystem.Buoys;
+using WaterConveyorSort.BoardSystem.StackQueue;
 
 namespace WaterConveyorSort.BoardSystem.Conveyor
 {
@@ -13,6 +14,7 @@ namespace WaterConveyorSort.BoardSystem.Conveyor
         internal bool IsLoaded { get; set; }
         internal bool IsReceiving { get; set; }
         internal BuoyStackHolder DepartureHolder { get; set; }
+        internal StackQueueExit DepartureExit { get; set; }
         public float DetectionRadius => detectionCollider != null ?
             detectionCollider.radius * Mathf.Max(Mathf.Abs(transform.lossyScale.x),
                 Mathf.Abs(transform.lossyScale.y), Mathf.Abs(transform.lossyScale.z)) : 0f;
@@ -22,6 +24,7 @@ namespace WaterConveyorSort.BoardSystem.Conveyor
         private void Update()
         {
             if (DepartureHolder != null && !DepartureHolder.ContainsGroup(this)) DepartureHolder = null;
+            if (DepartureExit != null && !DepartureExit.ContainsGroup(this)) DepartureExit = null;
         }
         public bool HasColor(int colorCode) => buoys.Count > 0 && buoys.TrueForAll(buoy => buoy.ColorCode == colorCode);
         internal Buoy TakeTop()

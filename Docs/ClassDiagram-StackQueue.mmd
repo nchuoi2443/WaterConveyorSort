@@ -6,18 +6,31 @@ class StackQueueController {
     -ConveyorController conveyor
     -BuoyTransferController transfers
     -StackQueueVisual visual
+    -InputSystem inputSystem
+    -StackQueueExit exit
     -bool accepting
     -bool failed
     +IReadOnlyList~BuoyStack~ Stacks
     +Action Full
-    +StackQueueController(ConveyorController conveyor, BuoyTransferController transfers, StackQueueVisual visual)
+    +StackQueueController(ConveyorController conveyor, BuoyTransferController transfers, StackQueueVisual visual, InputSystem inputSystem, StackQueueExit exit)
     +Initialize(int count) void
     +SetPaused(bool paused) void
+    -RefreshInput(int index) void
+    -OnStackClicked(BuoyStack stack) void
+    -FinishExport(int index, StackReservation reservation) void
+    -StartReceive(int index, StackReservation reservation, ConveyorBuoyGroup group, int baseIndex) void
     +TryReceive(ConveyorBuoyGroup group) bool
     -FindStack(int color) int
     +Clear() void
 }
+class PendingReceive {
+    +ConveyorBuoyGroup Group
+    +int BaseIndex
+}
 class StackReservation {
+    +bool Outgoing
+    +int Incoming
+    +List~PendingReceive~ Pending
     +int Count
     +int ColorCode
 }
@@ -29,6 +42,7 @@ class StackQueueExit {
     -OnTriggerEnter(Collider other) void
     -OnTriggerStay(Collider other) void
     -DetectGroup(Collider other) void
+    ~ContainsGroup(ConveyorBuoyGroup group) bool
     -OnDrawGizmosSelected() void
 }
 MonoBehaviour <|-- StackQueueExit
@@ -47,4 +61,6 @@ class StackQueueVisual {
 MonoBehaviour <|-- StackQueueVisual
 StackQueueController *-- StackReservation
 StackQueueController --> StackQueueVisual
+StackQueueController --> StackQueueExit : departure guard
+StackReservation *-- PendingReceive
 StackQueueExit --> StackQueueController : trigger entry

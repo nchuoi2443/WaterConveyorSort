@@ -116,6 +116,7 @@ namespace WaterConveyorSort.BoardSystem.Buoys
 
         private void RefreshInput()
         {
+            if (!cleared) visual.SetVisible(stacks.Count > 0 || pending.Count > 0);
             for (int i = 0; i < stacks.Count; i++)
                 stacks[i].CanReceiveInput = i == 0 && !busy && !cleared && transfer != null;
         }

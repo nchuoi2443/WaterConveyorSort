@@ -18,6 +18,12 @@ namespace WaterConveyorSort.BoardSystem.StackQueue
             ConveyorBuoyGroup group = other.GetComponent<ConveyorBuoyGroup>();
             if (group != null) queue.TryReceive(group);
         }
+        internal bool ContainsGroup(ConveyorBuoyGroup group)
+        {
+            Vector3 position = group.transform.position;
+            return (GetComponent<BoxCollider>().ClosestPoint(position) - position).sqrMagnitude <=
+                group.DetectionRadius * group.DetectionRadius;
+        }
         private void OnDrawGizmosSelected()
         {
             BoxCollider trigger = GetComponent<BoxCollider>();

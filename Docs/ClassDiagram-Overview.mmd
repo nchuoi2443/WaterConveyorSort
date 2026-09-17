@@ -15,8 +15,12 @@ LevelManager --> BoardManager : queue failure to Lost
 StackQueueController *-- BuoyStack : queue contents
 StackQueueController *-- StackReservation
 StackQueueController --> StackQueueVisual
-StackQueueController --> ConveyorController : detach at exit
-StackQueueController --> BuoyTransferController : reserved landings
+StackQueueController --> ConveyorController : exit and reentry
+StackQueueController --> BuoyTransferController : receive and export
+StackQueueController --> InputSystem : bind queue taps
+StackQueueController --> StackQueueExit : departure guard
+StackReservation *-- PendingReceive
+ConveyorBuoyGroup --> StackQueueExit : DepartureExit
 StackQueueExit --> StackQueueController : trigger entry
 BuoyStackHolderController *-- BuoyStackHolder
 BuoyStackHolderController ..> BuoyStack : lazy factory

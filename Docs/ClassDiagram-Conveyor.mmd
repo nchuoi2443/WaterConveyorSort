@@ -15,6 +15,7 @@ class ConveyorBuoyGroup {
     ~bool IsLoaded
     ~bool IsReceiving
     ~BuoyStackHolder DepartureHolder
+    ~StackQueueExit DepartureExit
     +float DetectionRadius
     -SphereCollider detectionCollider
     -Rigidbody body
@@ -61,6 +62,7 @@ class ConveyorController {
     ~RemoveGroup(ConveyorBuoyGroup group) void
     +ConfigurePathSlots(float spacing, float minimumGap) void
     +RequestEntry(Vector2Int outletCell, float spacing, Func~Vector3_float~ estimateArrival, Action~ConveyorBuoyGroup~ accepted) void
+    +RequestQueueEntry(float spacing, Func~Vector3_float~ estimateArrival, Action~ConveyorBuoyGroup~ accepted) void
     -ProcessEntries() void
     +CanReceiveFirst(ConveyorBuoyGroup group) bool
     +GetEntryHoldingOffset() Vector3
