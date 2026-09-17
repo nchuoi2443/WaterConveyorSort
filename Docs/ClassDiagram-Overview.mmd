@@ -61,4 +61,7 @@ ReceiveTransfer *-- ReceiveFlight
 ConveyorController *-- PathMoveSlot
 ConveyorController *-- GroupPosition
 ConveyorController *-- EnterRequest
+BoardManager *-- MaxBuoyCounterTxt
+MaxBuoyCounterTxt --> ConveyorController : GroupCountChanged
+LevelDataSO *-- MaxBuoyCounterTxtData
 Outline *-- ListVector3

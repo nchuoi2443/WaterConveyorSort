@@ -6,13 +6,23 @@ class LevelDataSO {
     -PathData path
     -List~BuoyNodeData~ buoyNodes
     -int maxStackInStackQueue
+    -int maxBuoyInConveyor
+    -MaxBuoyCounterTxtData maxBuoyCounterTxt
     +ColorDataSO ColorData
     +BoardData Board
     +PathData Path
     +IReadOnlyList~BuoyNodeData~ BuoyNodes
     +int MaxStackInStackQueue
+    +int MaxBuoyInConveyor
+    +MaxBuoyCounterTxtData MaxBuoyCounterTxt
 }
 ScriptableObject <|-- LevelDataSO
+class MaxBuoyCounterTxtData {
+    -bool enabled
+    -Vector2Int gridPosition
+    +bool Enabled
+    +Vector2Int GridPosition
+}
 class BoardData {
     -int width
     -int height
@@ -104,3 +114,4 @@ BuoyColumnData *-- BuoyData
 BuoyColumnData *-- ColumnElementData
 BuoyData *-- BuoyElementData
 ColorDataSO *-- ColorEntryData
+LevelDataSO *-- MaxBuoyCounterTxtData

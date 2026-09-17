@@ -202,3 +202,7 @@ MonoBehaviour:
         buoyTypeCount: 0
         elements: []
   maxStackInStackQueue: 5
+  maxBuoyInConveyor: 5
+  maxBuoyCounterTxt:
+    enabled: 1
+    gridPosition: {x: 4, y: 4}

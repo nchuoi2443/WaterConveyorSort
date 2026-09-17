@@ -36,6 +36,12 @@ class ConveyorController {
     -float rootYOffset
     -bool paused
     +Action~ConveyorBuoyGroup~ ReachedEnd
+    -int maxBuoyInConveyor
+    +int CurrentGroupCount
+    +int MaxBuoyInConveyor
+    +Action~int_int~ GroupCountChanged
+    +SetGroupCapacity(int maximum) void
+    -NotifyGroupCount() void
     +SetPaused(bool value) void
     +Configure(SplineComputer computer, SplineMesh mesh) void
     +SetMotionSettings(float speed, float yOffset) void
@@ -81,8 +87,22 @@ class EnterRequest {
     +Func~Vector3_float~ EstimateArrival
     +Action~ConveyorBuoyGroup~ Accepted
 }
+class MaxBuoyCounterTxt {
+    -TMP_Text counterText
+    -float heightOffset
+    +float HeightOffset
+    -ConveyorController conveyor
+    +ValidateSetup() void
+    +Bind(ConveyorController controller) void
+    -Refresh(int current, int maximum) void
+    -Unbind() void
+    +Release() void
+    -OnDestroy() void
+}
+MonoBehaviour <|-- MaxBuoyCounterTxt
 ConveyorController *-- ConveyorBuilder
 ConveyorController *-- ConveyorBuoyGroup
 ConveyorController *-- PathMoveSlot
 ConveyorController *-- GroupPosition
 ConveyorController *-- EnterRequest
+MaxBuoyCounterTxt --> ConveyorController : GroupCountChanged

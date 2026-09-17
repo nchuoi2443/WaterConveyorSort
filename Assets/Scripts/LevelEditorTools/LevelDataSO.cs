@@ -12,12 +12,26 @@ namespace WaterConveyorSort.LevelData
         [SerializeField] private PathData path = new PathData();
         [SerializeField] private List<BuoyNodeData> buoyNodes = new List<BuoyNodeData>();
         [SerializeField, Min(1)] private int maxStackInStackQueue = 3;
+        [Tooltip("Maximum number of groups on the conveyor, including loading reservations.")]
+        [SerializeField, Min(1)] private int maxBuoyInConveyor = 5;
+        [SerializeField] private MaxBuoyCounterTxtData maxBuoyCounterTxt = new MaxBuoyCounterTxtData();
 
         public ColorDataSO ColorData => colorData;
         public BoardData Board => board;
         public PathData Path => path;
         public IReadOnlyList<BuoyNodeData> BuoyNodes => buoyNodes;
         public int MaxStackInStackQueue => Mathf.Max(1, maxStackInStackQueue);
+        public int MaxBuoyInConveyor => Mathf.Max(1, maxBuoyInConveyor);
+        public MaxBuoyCounterTxtData MaxBuoyCounterTxt => maxBuoyCounterTxt;
+    }
+
+    [Serializable]
+    public sealed class MaxBuoyCounterTxtData
+    {
+        [SerializeField] private bool enabled;
+        [SerializeField] private Vector2Int gridPosition;
+        public bool Enabled => enabled;
+        public Vector2Int GridPosition => gridPosition;
     }
 
     [Serializable]

@@ -31,6 +31,7 @@ namespace WaterConveyorSort.LevelEditorTools
 
         private void OnUndoRedo()
         {
+            isPlacingCounter = false;
             draft.Cancel();
             isEditingNodes = false;
             isMovingNode = false;
@@ -53,6 +54,7 @@ namespace WaterConveyorSort.LevelEditorTools
             EditorGUI.BeginChangeCheck();
             int queueCount = EditorGUILayout.DelayedIntField("Max Stack In Stack Queue", level.MaxStackInStackQueue);
             if (EditorGUI.EndChangeCheck()) writer.SaveMaxStackInStackQueue(Mathf.Max(1, queueCount));
+            DrawCounterSettings(level);
             EditorGUILayout.Space();
             DrawToolbar(level);
 
@@ -64,15 +66,17 @@ namespace WaterConveyorSort.LevelEditorTools
                   "Click ô đã có để cắt phần đường phía sau. Gốc (0, 0) ở góc dưới trái."
                 : "Chọn Vẽ spline để chỉnh dữ liệu đường trên board.", MessageType.Info);
 
-            bool canSelectBoard = draft.IsEditing || isEditingNodes || isMovingNode;
+            bool canSelectBoard = draft.IsEditing || isEditingNodes || isMovingNode || isPlacingCounter;
             if (boardView.Draw(level.Board, cells, closed, level.BuoyNodes, selectedNodeIndex,
-                    canSelectBoard, out Vector2Int cell))
+                    canSelectBoard, out Vector2Int cell, level.MaxBuoyCounterTxt))
             {
                 if (draft.IsEditing)
                 {
                     draft.Visit(cell);
                     message = null;
                 }
+                else if (isPlacingCounter)
+                    PlaceCounter(level, cell);
                 else if (isMovingNode)
                     MoveSelectedNode(level, cell);
                 else
@@ -88,6 +92,7 @@ namespace WaterConveyorSort.LevelEditorTools
             nodeEditor.Draw(level, colorData, ColorDataFolder, ref selectedNodeIndex, writer, out bool moveRequested);
             if (moveRequested)
             {
+                isPlacingCounter = false;
                 isMovingNode = selectedNodeIndex >= 0;
                 isEditingNodes = false;
                 boardView.ReleaseInput();
@@ -144,6 +149,7 @@ namespace WaterConveyorSort.LevelEditorTools
                 if (GUILayout.Button("Vẽ spline"))
                 {
                     draft.Begin(level.Path);
+                    isPlacingCounter = false;
                     isEditingNodes = false;
                     isMovingNode = false;
                     message = null;
@@ -151,6 +157,7 @@ namespace WaterConveyorSort.LevelEditorTools
                 if (GUILayout.Button(isEditingNodes ? "Dừng chọn node" : "Chọn node"))
                 {
                     isEditingNodes = !isEditingNodes;
+                    isPlacingCounter = false;
                     isMovingNode = false;
                     boardView.ReleaseInput();
                     message = null;

@@ -15,6 +15,16 @@ namespace WaterConveyorSort.BoardSystem.Conveyor
         private float rootYOffset = 0.2f;
         private bool paused;
         public event Action<ConveyorBuoyGroup> ReachedEnd;
+        private int maxBuoyInConveyor = 5;
+        public int CurrentGroupCount => positions.Count;
+        public int MaxBuoyInConveyor => maxBuoyInConveyor;
+        public event Action<int, int> GroupCountChanged;
+        public void SetGroupCapacity(int maximum)
+        {
+            maxBuoyInConveyor = Mathf.Max(1, maximum);
+            NotifyGroupCount();
+        }
+        private void NotifyGroupCount() => GroupCountChanged?.Invoke(CurrentGroupCount, maxBuoyInConveyor);
         public void SetPaused(bool value) => paused = value;
         public void Configure(SplineComputer computer, SplineMesh mesh)
         {
@@ -41,14 +51,16 @@ namespace WaterConveyorSort.BoardSystem.Conveyor
         private float groupGap = 0.6f;
         internal void DetachGroup(ConveyorBuoyGroup group)
         {
-            positions.RemoveAll(position => position.Group == group);
+            int removed = positions.RemoveAll(position => position.Group == group);
             group.Moving = false;
+            if (removed > 0) NotifyGroupCount();
         }
         internal void RemoveGroup(ConveyorBuoyGroup group)
         {
-            positions.RemoveAll(position => position.Group == group);
+            int removed = positions.RemoveAll(position => position.Group == group);
             groups.Remove(group);
             group.Clear();
+            if (removed > 0) NotifyGroupCount();
         }
 
         public void ConfigurePathSlots(float spacing, float minimumGap)
@@ -81,6 +93,7 @@ namespace WaterConveyorSort.BoardSystem.Conveyor
             // Independent entry points can proceed; overlapping requests retain arrival order.
             for (int index = 0; index < waiting.Count;)
             {
+                if (CurrentGroupCount >= maxBuoyInConveyor) break;
                 EnterRequest request = waiting[index];
                 Vector3 entry = splineComputer.Evaluate(PercentAt(request.Distance)).position + root.up * rootYOffset;
                 float leadTime = Mathf.Max(0f, request.EstimateArrival(entry));
@@ -119,6 +132,7 @@ namespace WaterConveyorSort.BoardSystem.Conveyor
                 groups.Add(group);
                 positions.Add(new GroupPosition { Group = group, Distance = request.Distance });
                 PlaceGroup(positions[positions.Count - 1]);
+                NotifyGroupCount();
                 request.Accepted(group);
             }
         }
@@ -227,6 +241,7 @@ namespace WaterConveyorSort.BoardSystem.Conveyor
             groups.Clear();
             positions.Clear();
             waiting.Clear();
+            NotifyGroupCount();
         }
         private void OnDestroy() => ClearGroups();
 

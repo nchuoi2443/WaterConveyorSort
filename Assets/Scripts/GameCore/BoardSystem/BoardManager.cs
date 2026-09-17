@@ -19,6 +19,21 @@ namespace WaterConveyorSort.BoardSystem
         private BuoyStackHolderVisual buoyStackHolderPrefab;
 
         private InputSystem inputSystem;
+        private MaxBuoyCounterTxt counterPrefab;
+        private MaxBuoyCounterTxt counter;
+        public void ConfigureCounter(MaxBuoyCounterTxt prefab) => counterPrefab = prefab;
+        private void InitializeCounter(BoardData board, MaxBuoyCounterTxtData data)
+        {
+            if (data == null || !data.Enabled) return;
+            if (data.GridPosition.x < 0 || data.GridPosition.x >= board.Width ||
+                data.GridPosition.y < 0 || data.GridPosition.y >= board.Height)
+                throw new InvalidOperationException("MaxBuoyCounterTxt must be inside the board.");
+            counter = Instantiate(counterPrefab, boardRoot);
+            counter.name = "MaxBuoyCounterTxt";
+            counter.transform.SetParent(boardRoot, false);
+            counter.transform.localPosition = BoardCoordinates.CellToLocal(board, data.GridPosition) + Vector3.up * counter.HeightOffset;
+            counter.Bind(conveyorController);
+        }
         private StackQueueVisual stackQueueVisual;
         private StackQueueExit stackQueueExit;
         private StackQueueController stackQueue;
@@ -74,7 +89,8 @@ namespace WaterConveyorSort.BoardSystem
         private readonly BuoyStackHolderController buoyStackHolderController = new BuoyStackHolderController();
 
         public void InitBoard(BoardData boardData, PathData pathData,
-            IReadOnlyList<BuoyNodeData> nodes, ColorDataSO colors, int maxStackInStackQueue = 3)
+            IReadOnlyList<BuoyNodeData> nodes, ColorDataSO colors, int maxStackInStackQueue = 3,
+            int maxBuoyInConveyor = 5, MaxBuoyCounterTxtData counterData = null)
         {
             if (boardRoot == null)
                 throw new InvalidOperationException("BoardManager requires a board root.");
@@ -83,6 +99,12 @@ namespace WaterConveyorSort.BoardSystem
             if (stackQueueVisual == null || stackQueueExit == null)
                 throw new InvalidOperationException("Assign Stack Queue Visual and Stack Queue Exit on LevelManager.");
             stackQueueVisual.ValidateSetup();
+            if (counterData != null && counterData.Enabled)
+            {
+                if (counterPrefab == null)
+                    throw new InvalidOperationException("Assign your Max Buoy Counter Prefab on LevelManager.");
+                counterPrefab.ValidateSetup();
+            }
             if (nodes != null && nodes.Count > 0 &&
                 (buoyPrefab == null || buoyStackPrefab == null || buoyStackHolderPrefab == null))
                 throw new InvalidOperationException("Assign all three buoy prefabs on LevelManager.");
@@ -91,10 +113,14 @@ namespace WaterConveyorSort.BoardSystem
             if (inputSystem == null) inputSystem = gameObject.AddComponent<InputSystem>();
 
             transfers?.Clear();
+            if (counter != null) counter.Release();
+            counter = null;
             stackQueueExit.Clear();
             stackQueue?.Clear();
             buoyStackHolderController.Clear();
             conveyorController.InitConveyor(boardData, pathData, boardRoot);
+            conveyorController.SetGroupCapacity(maxBuoyInConveyor);
+            InitializeCounter(boardData, counterData);
             buoyStackHolderController.InitHolders(boardData, nodes, colors, boardRoot,
                 buoyStackHolderPrefab, buoyStackPrefab, buoyPrefab, inputSystem);
             transfers = new BuoyTransferController(conveyorController);
@@ -112,6 +138,7 @@ namespace WaterConveyorSort.BoardSystem
 
         private void OnDestroy()
         {
+            if (counter != null) counter.Release();
             transfers?.Clear();
             if (stackQueueExit != null) stackQueueExit.Clear();
             stackQueue?.Clear();

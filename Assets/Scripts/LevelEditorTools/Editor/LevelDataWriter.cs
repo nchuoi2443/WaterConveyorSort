@@ -10,6 +10,20 @@ namespace WaterConveyorSort.LevelEditorTools
     {
         private readonly SerializedObject serialized;
         public LevelDataWriter(SerializedObject serialized) { this.serialized = serialized; }
+        public void SaveMaxBuoyInConveyor(int count)
+        {
+            serialized.Update();
+            serialized.FindProperty("maxBuoyInConveyor").intValue = Mathf.Max(1, count);
+            Commit("Edit Conveyor Group Capacity");
+        }
+        public void SaveMaxBuoyCounter(bool enabled, Vector2Int position)
+        {
+            serialized.Update();
+            SerializedProperty counter = serialized.FindProperty("maxBuoyCounterTxt");
+            counter.FindPropertyRelative("enabled").boolValue = enabled;
+            counter.FindPropertyRelative("gridPosition").vector2IntValue = position;
+            Commit("Edit MaxBuoyCounterTxt Node");
+        }
         public void SaveMaxStackInStackQueue(int count)
         {
             serialized.Update();

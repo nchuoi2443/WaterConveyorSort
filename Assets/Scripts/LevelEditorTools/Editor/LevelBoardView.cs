@@ -20,7 +20,8 @@ namespace WaterConveyorSort.LevelEditorTools
         }
 
         public bool Draw(BoardData board, IReadOnlyList<Vector2Int> cells, bool closed,
-            IReadOnlyList<BuoyNodeData> nodes, int selectedNodeIndex, bool editable, out Vector2Int selectedCell)
+            IReadOnlyList<BuoyNodeData> nodes, int selectedNodeIndex, bool editable, out Vector2Int selectedCell,
+            MaxBuoyCounterTxtData counter = null)
         {
             selectedCell = default;
             bool selected = false;
@@ -64,6 +65,12 @@ namespace WaterConveyorSort.LevelEditorTools
                     Color color = i == selectedNodeIndex ? new Color(1f, 0.85f, 0.25f) : new Color(0.6f, 0.3f, 0.9f);
                     EditorGUI.DrawRect(rect, color);
                     GUI.Label(rect, $"N{i + 1}", EditorStyles.centeredGreyMiniLabel);
+                }
+                if (counter != null && counter.Enabled)
+                {
+                    Rect rect = CellRect(counter.GridPosition, board.Height);
+                    EditorGUI.DrawRect(rect, new Color(0.2f, 0.75f, 0.65f));
+                    GUI.Label(rect, "MAX", EditorStyles.centeredGreyMiniLabel);
                 }
             }
 

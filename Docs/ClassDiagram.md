@@ -72,6 +72,9 @@ ReceiveTransfer *-- ReceiveFlight
 ConveyorController *-- PathMoveSlot
 ConveyorController *-- GroupPosition
 ConveyorController *-- EnterRequest
+BoardManager *-- MaxBuoyCounterTxt
+MaxBuoyCounterTxt --> ConveyorController : GroupCountChanged
+LevelDataSO *-- MaxBuoyCounterTxtData
 Outline *-- ListVector3
 ```
 
@@ -90,6 +93,10 @@ class BoardManager {
     -BuoyStackVisual buoyStackPrefab
     -BuoyStackHolderVisual buoyStackHolderPrefab
     -InputSystem inputSystem
+    -MaxBuoyCounterTxt counterPrefab
+    -MaxBuoyCounterTxt counter
+    +ConfigureCounter(MaxBuoyCounterTxt prefab) void
+    -InitializeCounter(BoardData board, MaxBuoyCounterTxtData data) void
     -StackQueueVisual stackQueueVisual
     -StackQueueExit stackQueueExit
     -StackQueueController stackQueue
@@ -109,7 +116,7 @@ class BoardManager {
     -BuoyTransferController transfers
     -LateUpdate() void
     -BuoyStackHolderController buoyStackHolderController
-    +InitBoard(BoardData boardData, PathData pathData, IReadOnlyList~BuoyNodeData~ nodes, ColorDataSO colors, int maxStackInStackQueue = 3) void
+    +InitBoard(BoardData boardData, PathData pathData, IReadOnlyList~BuoyNodeData~ nodes, ColorDataSO colors, int maxStackInStackQueue = 3, int maxBuoyInConveyor = 5, MaxBuoyCounterTxtData counterData = null) void
     -OnDestroy() void
 }
 MonoBehaviour <|-- BoardManager
@@ -153,6 +160,7 @@ class LevelManager {
     -float receiveLaunchDelay
     -StackQueueVisual stackQueueVisual
     -StackQueueExit stackQueueExit
+    -MaxBuoyCounterTxt maxBuoyCounterPrefab
     +bool HasLost
     +Action Lost
     -OnStackQueueFull() void
@@ -188,6 +196,10 @@ private BuoyVisual buoyPrefab;
 private BuoyStackVisual buoyStackPrefab;
 private BuoyStackHolderVisual buoyStackHolderPrefab;
 private InputSystem inputSystem;
+private MaxBuoyCounterTxt counterPrefab;
+private MaxBuoyCounterTxt counter;
+public void ConfigureCounter(MaxBuoyCounterTxt prefab)
+private void InitializeCounter(BoardData board, MaxBuoyCounterTxtData data)
 private StackQueueVisual stackQueueVisual;
 private StackQueueExit stackQueueExit;
 private StackQueueController stackQueue;
@@ -207,7 +219,7 @@ public void SetMotionSettings(float speed, float interval)
 private BuoyTransferController transfers;
 private void LateUpdate()
 private readonly BuoyStackHolderController buoyStackHolderController = new BuoyStackHolderController();
-public void InitBoard(BoardData boardData, PathData pathData, IReadOnlyList<BuoyNodeData> nodes, ColorDataSO colors, int maxStackInStackQueue = 3)
+public void InitBoard(BoardData boardData, PathData pathData, IReadOnlyList<BuoyNodeData> nodes, ColorDataSO colors, int maxStackInStackQueue = 3, int maxBuoyInConveyor = 5, MaxBuoyCounterTxtData counterData = null)
 private void OnDestroy()
 ```
 
@@ -286,6 +298,8 @@ private float receiveLaunchDelay = 0.12f;
 private StackQueueVisual stackQueueVisual;
 [SerializeField]
 private StackQueueExit stackQueueExit;
+[Header("Conveyor Counter")] [SerializeField]
+private MaxBuoyCounterTxt maxBuoyCounterPrefab;
 public bool HasLost { get; set; }
 public event Action Lost;
 private void OnStackQueueFull()
@@ -707,6 +721,12 @@ class ConveyorController {
     -float rootYOffset
     -bool paused
     +Action~ConveyorBuoyGroup~ ReachedEnd
+    -int maxBuoyInConveyor
+    +int CurrentGroupCount
+    +int MaxBuoyInConveyor
+    +Action~int_int~ GroupCountChanged
+    +SetGroupCapacity(int maximum) void
+    -NotifyGroupCount() void
     +SetPaused(bool value) void
     +Configure(SplineComputer computer, SplineMesh mesh) void
     +SetMotionSettings(float speed, float yOffset) void
@@ -752,11 +772,25 @@ class EnterRequest {
     +Func~Vector3_float~ EstimateArrival
     +Action~ConveyorBuoyGroup~ Accepted
 }
+class MaxBuoyCounterTxt {
+    -TMP_Text counterText
+    -float heightOffset
+    +float HeightOffset
+    -ConveyorController conveyor
+    +ValidateSetup() void
+    +Bind(ConveyorController controller) void
+    -Refresh(int current, int maximum) void
+    -Unbind() void
+    +Release() void
+    -OnDestroy() void
+}
+MonoBehaviour <|-- MaxBuoyCounterTxt
 ConveyorController *-- ConveyorBuilder
 ConveyorController *-- ConveyorBuoyGroup
 ConveyorController *-- PathMoveSlot
 ConveyorController *-- GroupPosition
 ConveyorController *-- EnterRequest
+MaxBuoyCounterTxt --> ConveyorController : GroupCountChanged
 ```
 
 ### ConveyorBuilder
@@ -808,6 +842,12 @@ private float moveSpeed = 1f;
 private float rootYOffset = 0.2f;
 private bool paused;
 public event Action<ConveyorBuoyGroup> ReachedEnd;
+private int maxBuoyInConveyor = 5;
+public int CurrentGroupCount => positions.Count;
+public int MaxBuoyInConveyor => maxBuoyInConveyor;
+public event Action<int, int> GroupCountChanged;
+public void SetGroupCapacity(int maximum)
+private void NotifyGroupCount()
 public void SetPaused(bool value)
 public void Configure(SplineComputer computer, SplineMesh mesh)
 public void SetMotionSettings(float speed, float yOffset)
@@ -866,6 +906,25 @@ Source: [Assets/Scripts/GameCore/BoardSystem/Conveyor/ConveyorController.cs](../
 public float Distance, Spacing;
 public Func<Vector3, float> EstimateArrival;
 public Action<ConveyorBuoyGroup> Accepted;
+```
+
+### MaxBuoyCounterTxt
+
+Source: [Assets/Scripts/GameCore/BoardSystem/Conveyor/MaxBuoyCounterTxt.cs](../Assets/Scripts/GameCore/BoardSystem/Conveyor/MaxBuoyCounterTxt.cs).
+
+```csharp
+[SerializeField]
+private TMP_Text counterText;
+[SerializeField]
+private float heightOffset = 0.8f;
+public float HeightOffset => heightOffset;
+private ConveyorController conveyor;
+public void ValidateSetup()
+public void Bind(ConveyorController controller)
+private void Refresh(int current, int maximum)
+private void Unbind()
+public void Release()
+private void OnDestroy()
 ```
 
 ## Stack queue and exit
@@ -1136,13 +1195,23 @@ class LevelDataSO {
     -PathData path
     -List~BuoyNodeData~ buoyNodes
     -int maxStackInStackQueue
+    -int maxBuoyInConveyor
+    -MaxBuoyCounterTxtData maxBuoyCounterTxt
     +ColorDataSO ColorData
     +BoardData Board
     +PathData Path
     +IReadOnlyList~BuoyNodeData~ BuoyNodes
     +int MaxStackInStackQueue
+    +int MaxBuoyInConveyor
+    +MaxBuoyCounterTxtData MaxBuoyCounterTxt
 }
 ScriptableObject <|-- LevelDataSO
+class MaxBuoyCounterTxtData {
+    -bool enabled
+    -Vector2Int gridPosition
+    +bool Enabled
+    +Vector2Int GridPosition
+}
 class BoardData {
     -int width
     -int height
@@ -1234,6 +1303,7 @@ BuoyColumnData *-- BuoyData
 BuoyColumnData *-- ColumnElementData
 BuoyData *-- BuoyElementData
 ColorDataSO *-- ColorEntryData
+LevelDataSO *-- MaxBuoyCounterTxtData
 ```
 
 ### LevelDataSO
@@ -1251,11 +1321,30 @@ private PathData path = new PathData();
 private List<BuoyNodeData> buoyNodes = new List<BuoyNodeData>();
 [SerializeField, Min(1)]
 private int maxStackInStackQueue = 3;
+[Tooltip("Maximum number of groups on the conveyor, including loading reservations.")] [SerializeField, Min(1)]
+private int maxBuoyInConveyor = 5;
+[SerializeField]
+private MaxBuoyCounterTxtData maxBuoyCounterTxt = new MaxBuoyCounterTxtData();
 public ColorDataSO ColorData => colorData;
 public BoardData Board => board;
 public PathData Path => path;
 public IReadOnlyList<BuoyNodeData> BuoyNodes => buoyNodes;
 public int MaxStackInStackQueue => Mathf.Max(1, maxStackInStackQueue);
+public int MaxBuoyInConveyor => Mathf.Max(1, maxBuoyInConveyor);
+public MaxBuoyCounterTxtData MaxBuoyCounterTxt => maxBuoyCounterTxt;
+```
+
+### MaxBuoyCounterTxtData
+
+Source: [Assets/Scripts/LevelEditorTools/LevelDataSO.cs](../Assets/Scripts/LevelEditorTools/LevelDataSO.cs).
+
+```csharp
+[SerializeField]
+private bool enabled;
+[SerializeField]
+private Vector2Int gridPosition;
+public bool Enabled => enabled;
+public Vector2Int GridPosition => gridPosition;
 ```
 
 ### BoardData
@@ -1530,6 +1619,7 @@ public List<Vector3> data;
 - The holder root trigger detects a group using Enter/Stay. Group detection uses a trigger sphere and kinematic Rigidbody.
 - Matching loaded groups are claimed with IsReceiving and continue moving while overlapping flights launch to reserved stack indices. Landings commit in order. Serialized fields on LevelManager (holder receiving) and StackQueueVisual (queue receiving) control flight duration and launch delay; each transfer snapshots its timing settings.
 - DepartureHolder prevents immediate return to the source until its trigger volume has been left.
+- LevelDataSO.MaxBuoyInConveyor limits active conveyor group reservations. MaxBuoyCounterTxt is a separate placed grid node showing current/max; full capacity queues further entry requests.
 - StackQueue initializes LevelDataSO.MaxStackInStackQueue empty stacks, centered on its spawn root along local X. It chooses the first empty or same-color stack without a buoy limit.
 - Queue reservations claim colors and landing indices immediately; overlapping same-color transfers commit in global stack order.
 - Open conveyors notify ReachedEnd once per loaded group. StackQueueExit provides a configurable trigger for open or closed paths. Accepted queue groups release path occupancy immediately and launch from the exit.

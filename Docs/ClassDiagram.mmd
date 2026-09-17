@@ -10,6 +10,10 @@ class BoardManager {
     -BuoyStackVisual buoyStackPrefab
     -BuoyStackHolderVisual buoyStackHolderPrefab
     -InputSystem inputSystem
+    -MaxBuoyCounterTxt counterPrefab
+    -MaxBuoyCounterTxt counter
+    +ConfigureCounter(MaxBuoyCounterTxt prefab) void
+    -InitializeCounter(BoardData board, MaxBuoyCounterTxtData data) void
     -StackQueueVisual stackQueueVisual
     -StackQueueExit stackQueueExit
     -StackQueueController stackQueue
@@ -29,7 +33,7 @@ class BoardManager {
     -BuoyTransferController transfers
     -LateUpdate() void
     -BuoyStackHolderController buoyStackHolderController
-    +InitBoard(BoardData boardData, PathData pathData, IReadOnlyList~BuoyNodeData~ nodes, ColorDataSO colors, int maxStackInStackQueue = 3) void
+    +InitBoard(BoardData boardData, PathData pathData, IReadOnlyList~BuoyNodeData~ nodes, ColorDataSO colors, int maxStackInStackQueue = 3, int maxBuoyInConveyor = 5, MaxBuoyCounterTxtData counterData = null) void
     -OnDestroy() void
 }
 MonoBehaviour <|-- BoardManager
@@ -265,6 +269,12 @@ class ConveyorController {
     -float rootYOffset
     -bool paused
     +Action~ConveyorBuoyGroup~ ReachedEnd
+    -int maxBuoyInConveyor
+    +int CurrentGroupCount
+    +int MaxBuoyInConveyor
+    +Action~int_int~ GroupCountChanged
+    +SetGroupCapacity(int maximum) void
+    -NotifyGroupCount() void
     +SetPaused(bool value) void
     +Configure(SplineComputer computer, SplineMesh mesh) void
     +SetMotionSettings(float speed, float yOffset) void
@@ -310,6 +320,19 @@ class EnterRequest {
     +Func~Vector3_float~ EstimateArrival
     +Action~ConveyorBuoyGroup~ Accepted
 }
+class MaxBuoyCounterTxt {
+    -TMP_Text counterText
+    -float heightOffset
+    +float HeightOffset
+    -ConveyorController conveyor
+    +ValidateSetup() void
+    +Bind(ConveyorController controller) void
+    -Refresh(int current, int maximum) void
+    -Unbind() void
+    +Release() void
+    -OnDestroy() void
+}
+MonoBehaviour <|-- MaxBuoyCounterTxt
 class StackQueueController {
     -List~BuoyStack~ stacks
     -List~StackReservation~ reservations
@@ -395,6 +418,7 @@ class LevelManager {
     -float receiveLaunchDelay
     -StackQueueVisual stackQueueVisual
     -StackQueueExit stackQueueExit
+    -MaxBuoyCounterTxt maxBuoyCounterPrefab
     +bool HasLost
     +Action Lost
     -OnStackQueueFull() void
@@ -411,13 +435,23 @@ class LevelDataSO {
     -PathData path
     -List~BuoyNodeData~ buoyNodes
     -int maxStackInStackQueue
+    -int maxBuoyInConveyor
+    -MaxBuoyCounterTxtData maxBuoyCounterTxt
     +ColorDataSO ColorData
     +BoardData Board
     +PathData Path
     +IReadOnlyList~BuoyNodeData~ BuoyNodes
     +int MaxStackInStackQueue
+    +int MaxBuoyInConveyor
+    +MaxBuoyCounterTxtData MaxBuoyCounterTxt
 }
 ScriptableObject <|-- LevelDataSO
+class MaxBuoyCounterTxtData {
+    -bool enabled
+    -Vector2Int gridPosition
+    +bool Enabled
+    +Vector2Int GridPosition
+}
 class BoardData {
     -int width
     -int height
@@ -602,4 +636,7 @@ ReceiveTransfer *-- ReceiveFlight
 ConveyorController *-- PathMoveSlot
 ConveyorController *-- GroupPosition
 ConveyorController *-- EnterRequest
+BoardManager *-- MaxBuoyCounterTxt
+MaxBuoyCounterTxt --> ConveyorController : GroupCountChanged
+LevelDataSO *-- MaxBuoyCounterTxtData
 Outline *-- ListVector3

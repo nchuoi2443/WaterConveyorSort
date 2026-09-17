@@ -39,6 +39,8 @@ namespace WaterConveyorSort.LevelSystem
         [Header("Stack Queue")]
         [SerializeField] private StackQueueVisual stackQueueVisual;
         [SerializeField] private StackQueueExit stackQueueExit;
+        [Header("Conveyor Counter")]
+        [SerializeField] private MaxBuoyCounterTxt maxBuoyCounterPrefab;
         public bool HasLost { get; private set; }
         public event Action Lost;
         private void OnStackQueueFull()
@@ -87,12 +89,13 @@ namespace WaterConveyorSort.LevelSystem
             conveyorController.ConfigurePathSlots(pathMoveSlotSpacing, conveyorGroupGap);
             boardManager.Configure(boardRoot, conveyorController, inputSystem, buoyPrefab, buoyStackPrefab, buoyStackHolderPrefab);
             boardManager.ConfigureStackQueue(stackQueueVisual, stackQueueExit);
+            boardManager.ConfigureCounter(maxBuoyCounterPrefab);
             boardManager.StackQueueFull -= OnStackQueueFull;
             boardManager.StackQueueFull += OnStackQueueFull;
             HasLost = false;
             ApplyMotionSettings();
             boardManager.InitBoard(levelData.Board, levelData.Path, levelData.BuoyNodes, levelData.ColorData,
-                levelData.MaxStackInStackQueue);
+                levelData.MaxStackInStackQueue, levelData.MaxBuoyInConveyor, levelData.MaxBuoyCounterTxt);
         }
     }
 }

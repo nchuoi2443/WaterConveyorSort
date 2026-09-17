@@ -25,6 +25,8 @@ namespace WaterConveyorSort.LevelEditorTools
         private List<string> ValidateLevel(LevelDataSO level, ColorDataSO colorData)
         {
             var errors = new List<string>();
+            if (level.MaxBuoyCounterTxt.Enabled && !CanPlaceCounter(level, level.MaxBuoyCounterTxt.GridPosition))
+                errors.Add("MaxBuoyCounterTxt must occupy a free cell inside the board.");
             string pathError = ValidatePath(level.Path.Cells, level.Path.IsClosed, level);
             if (pathError != null)
                 errors.Add(pathError);

@@ -137,3 +137,13 @@ Verify in Play Mode:
 - Reset during multiple queue flights or after a loss; clear all stacks/reservations and resume input.
 
 Empty Stack Height on BuoyStackVisual sets the default pole height only when there are no buoys. Queue spawning uses this prefab value directly. Once buoys land, pole height follows buoy count and spacing. Changing the value in Play Mode refreshes the visual; empty stacks remain non-clickable.
+
+## Conveyor group capacity and counter node
+
+LevelDataSO.MaxBuoyInConveyor is the maximum number of groups on the conveyor (default 5), not the number of individual buoys. Active loading reservations count toward the limit; entry requests waiting for admission do not. New entries wait when the limit is reached. Detaching a group into StackQueue releases capacity immediately; a holder receive releases capacity when its flights finish. Clear/reinitialize resets the count.
+
+In the level inspector, Conveyor Capacity exposes Max Buoy In Conveyor (Groups). MaxBuoyCounterTxt is a separate optional node: enable it and choose a free Grid Position, or click Place Counter On Board and select a free cell. The grid marks it MAX. It does not create a holder or require an outlet direction. Counter placement, path editing and board resizing validate its position. Undo/redo uses the existing serialized data writer.
+
+Create your own counter prefab with MaxBuoyCounterTxt on its root and a TMP Text child assigned to Counter Text. Assign the prefab to LevelManager / Conveyor Counter / Max Buoy Counter Prefab. The system only instantiates that prefab and updates its text; it does not create a GameObject/text fallback or override the prefab's rotation, font, alignment or styling. Height Offset positions the prefab above the selected grid cell. LevelDataTest enables the counter at (4,4); SampleScene's prefab field is intentionally empty for your prefab. Missing prefab/text references produce explicit setup errors before resetting the board.
+
+The counter subscribes to the conveyor's local GroupCountChanged event, displays current/max on binding and unsubscribes on reset/destruction. With four reserved groups and a maximum of five it displays 4/5.

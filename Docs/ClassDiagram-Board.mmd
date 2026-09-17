@@ -10,6 +10,10 @@ class BoardManager {
     -BuoyStackVisual buoyStackPrefab
     -BuoyStackHolderVisual buoyStackHolderPrefab
     -InputSystem inputSystem
+    -MaxBuoyCounterTxt counterPrefab
+    -MaxBuoyCounterTxt counter
+    +ConfigureCounter(MaxBuoyCounterTxt prefab) void
+    -InitializeCounter(BoardData board, MaxBuoyCounterTxtData data) void
     -StackQueueVisual stackQueueVisual
     -StackQueueExit stackQueueExit
     -StackQueueController stackQueue
@@ -29,7 +33,7 @@ class BoardManager {
     -BuoyTransferController transfers
     -LateUpdate() void
     -BuoyStackHolderController buoyStackHolderController
-    +InitBoard(BoardData boardData, PathData pathData, IReadOnlyList~BuoyNodeData~ nodes, ColorDataSO colors, int maxStackInStackQueue = 3) void
+    +InitBoard(BoardData boardData, PathData pathData, IReadOnlyList~BuoyNodeData~ nodes, ColorDataSO colors, int maxStackInStackQueue = 3, int maxBuoyInConveyor = 5, MaxBuoyCounterTxtData counterData = null) void
     -OnDestroy() void
 }
 MonoBehaviour <|-- BoardManager
@@ -73,6 +77,7 @@ class LevelManager {
     -float receiveLaunchDelay
     -StackQueueVisual stackQueueVisual
     -StackQueueExit stackQueueExit
+    -MaxBuoyCounterTxt maxBuoyCounterPrefab
     +bool HasLost
     +Action Lost
     -OnStackQueueFull() void

@@ -9,6 +9,7 @@ namespace WaterConveyorSort.LevelEditorTools
     {
         private bool FitsBoard(LevelDataSO level, int width, int height)
         {
+            if (level.MaxBuoyCounterTxt.Enabled && !Contains(level.MaxBuoyCounterTxt.GridPosition, width, height)) return false;
             foreach (Vector2Int cell in level.Path.Cells)
                 if (!Contains(cell, width, height)) return false;
             foreach (BuoyNodeData node in level.BuoyNodes)
@@ -20,6 +21,8 @@ namespace WaterConveyorSort.LevelEditorTools
         {
             if (cells.Count < 2) return "Đường cần ít nhất 2 ô.";
             var occupied = new HashSet<Vector2Int>();
+            if (level.MaxBuoyCounterTxt.Enabled && ContainsPathCell(cells, level.MaxBuoyCounterTxt.GridPosition))
+                return "Path overlaps MaxBuoyCounterTxt.";
             for (int i = 0; i < cells.Count; i++)
             {
                 if (!Contains(cells[i], level.Board.Width, level.Board.Height)) return "Đường nằm ngoài board.";
@@ -41,6 +44,7 @@ namespace WaterConveyorSort.LevelEditorTools
 
         private bool CanPlaceNode(LevelDataSO level, Vector2Int cell)
         {
+            if (level.MaxBuoyCounterTxt.Enabled && level.MaxBuoyCounterTxt.GridPosition == cell) return false;
             if (!Contains(cell, level.Board.Width, level.Board.Height))
                 return false;
             if (ContainsPathCell(level.Path.Cells, cell))
@@ -56,6 +60,7 @@ namespace WaterConveyorSort.LevelEditorTools
 
         private bool CanMoveNode(LevelDataSO level, int nodeIndex, Vector2Int cell)
         {
+            if (level.MaxBuoyCounterTxt.Enabled && level.MaxBuoyCounterTxt.GridPosition == cell) return false;
             if (nodeIndex < 0 || nodeIndex >= level.BuoyNodes.Count)
                 return false;
             if (!Contains(cell, level.Board.Width, level.Board.Height))
