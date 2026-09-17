@@ -10,7 +10,28 @@ namespace WaterConveyorSort.BoardSystem.Buoys
         private readonly BuoyStackVisual visual;
         private readonly List<Buoy> buoys = new List<Buoy>();
         private bool cleared;
-        public bool CanReceiveInput { get; set; } = true;
+        internal BuoyStackVisual Visual => visual;
+        private bool canReceiveInput;
+        public bool CanReceiveInput
+        {
+            get => !cleared && canReceiveInput;
+            set { canReceiveInput = value; visual.SetInputEnabled(value && !cleared); }
+        }
+        public List<Buoy> GetTopGroup()
+        {
+            var result = new List<Buoy>();
+            if (buoys.Count == 0) return result;
+            int color = buoys[buoys.Count - 1].ColorCode;
+            for (int i = buoys.Count - 1; i >= 0 && buoys[i].ColorCode == color; i--) result.Add(buoys[i]);
+            return result;
+        }
+        internal void RemoveTop(Buoy buoy)
+        {
+            if (buoys.Count == 0 || buoys[buoys.Count - 1] != buoy)
+                throw new InvalidOperationException("Only the top buoy can leave a stack.");
+            buoys.RemoveAt(buoys.Count - 1);
+            visual.RefreshHeight(buoys.Count);
+        }
         public event Action<BuoyStack> Clicked;
 
         public IReadOnlyList<Buoy> Buoys { get; }
@@ -36,6 +57,7 @@ namespace WaterConveyorSort.BoardSystem.Buoys
             if (buoy == null) throw new ArgumentNullException(nameof(buoy));
             buoys.Add(buoy);
             visual.PlaceBuoy(buoy.Visual.transform, buoys.Count - 1);
+            visual.RefreshHeight(buoys.Count);
         }
 
         public void OnClick()

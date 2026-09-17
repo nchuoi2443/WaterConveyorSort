@@ -36,6 +36,43 @@ namespace WaterConveyorSort.BoardSystem.Buoys
             visual.PlaceStack(stackVisual.transform, stacks.Count - 1);
         }
 
+        private BuoyTransferController transfer;
+        private bool busy;
+        public void InitializeTransfers(BuoyTransferController controller)
+        {
+            transfer = controller;
+            foreach (BuoyStack stack in stacks) stack.Clicked += OnStackClicked;
+            AdvanceQueue();
+        }
+        private void OnStackClicked(BuoyStack stack)
+        {
+            if (busy || stack != ActiveStack || transfer == null) return;
+            busy = true;
+            stack.CanReceiveInput = false;
+            try { transfer.Begin(stack, OutletCell, FinishTransfer); }
+            catch { busy = false; stack.CanReceiveInput = true; throw; }
+        }
+        private void FinishTransfer()
+        {
+            busy = false;
+            AdvanceQueue();
+        }
+        private void AdvanceQueue()
+        {
+            while (ActiveStack != null && ActiveStack.Buoys.Count == 0)
+            {
+                ActiveStack.Clicked -= OnStackClicked;
+                ActiveStack.Clear();
+                stacks.RemoveAt(0);
+            }
+            for (int i = 0; i < stacks.Count; i++)
+            {
+                visual.PlaceStack(stacks[i].Visual.transform, i);
+                stacks[i].CanReceiveInput = i == 0 && !busy;
+            }
+            visual.Refresh(stacks.Count);
+        }
+
         public void Clear()
         {
             foreach (BuoyStack stack in stacks) stack.Clear();

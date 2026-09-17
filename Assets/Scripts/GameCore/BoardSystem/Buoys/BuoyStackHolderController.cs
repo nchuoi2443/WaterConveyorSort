@@ -47,7 +47,7 @@ namespace WaterConveyorSort.BoardSystem.Buoys
                         visual.transform.localRotation = Quaternion.identity;
                         var holder = new BuoyStackHolder(node, visual);
                         holders.Add(holder);
-                        // Spawn every column for now; queue advancement will be implemented separately.
+                        // Spawn the queue; the holder activates its first non-empty stack after initialization.
                         for (int i = 0; i < node.Columns.Count; i++)
                             CreateStack(holder, visual.transform, node.Columns[i], i, colors, stackPrefab, buoyPrefab, inputSystem);
                     }

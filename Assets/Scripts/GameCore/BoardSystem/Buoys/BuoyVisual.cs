@@ -35,6 +35,12 @@ namespace WaterConveyorSort.BoardSystem.Buoys
                 target.SetPropertyBlock(propertyBlock);
             }
         }
+        public bool MoveTowards(Vector3 target, float distance)
+        {
+            transform.position = Vector3.MoveTowards(transform.position, target, distance);
+            return (transform.position - target).sqrMagnitude <= 0.000001f;
+        }
+
         private bool released;
 
         public void Release()

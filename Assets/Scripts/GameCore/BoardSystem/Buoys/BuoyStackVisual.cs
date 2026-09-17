@@ -8,7 +8,62 @@ namespace WaterConveyorSort.BoardSystem.Buoys
     {
         [SerializeField] private Transform buoyRoot;
         [SerializeField] private Vector3 firstBuoyOffset = new Vector3(0f, 0.2f, 0f);
-        [SerializeField, Min(0.01f)] private float buoySpacing = 0.2f;
+        [SerializeField, Min(0f)] private float buoySpacing = 0f;
+        [SerializeField, Min(0.01f)] private float buoyHeight = 0.2f;
+        [SerializeField] private Transform poleTransform;
+        public float Step => buoyHeight + buoySpacing;
+        private Vector3 poleScale, polePosition;
+        private Bounds poleBounds;
+        private bool poleCached;
+        private bool inputEnabled;
+        private int count;
+
+        public void SetInputEnabled(bool enabled)
+        {
+            inputEnabled = enabled;
+            if (inputColliders == null) return;
+            foreach (Collider item in inputColliders)
+                if (item != null) item.enabled = enabled && count > 0;
+        }
+
+        public void RefreshHeight(int buoyCount)
+        {
+            count = buoyCount;
+            float height = count > 0 ? buoyHeight * count + buoySpacing * (count - 1) : 0f;
+            if (poleTransform != null)
+            {
+                if (!poleCached)
+                {
+                    var mesh = poleTransform.GetComponent<MeshFilter>();
+                    if (mesh != null && mesh.sharedMesh != null)
+                    {
+                        poleBounds = mesh.sharedMesh.bounds;
+                        poleScale = poleTransform.localScale;
+                        polePosition = poleTransform.localPosition;
+                        poleCached = true;
+                    }
+                }
+                poleTransform.gameObject.SetActive(count > 0);
+                if (poleCached && height > 0f && poleBounds.size.y > 0f)
+                {
+                    Vector3 scale = poleScale;
+                    float parentScale = poleTransform.parent.TransformVector(Vector3.up).magnitude;
+                    scale.y = height * transform.TransformVector(Vector3.up).magnitude / (poleBounds.size.y * parentScale);
+                    poleTransform.localScale = scale;
+                    poleTransform.localPosition = polePosition + Vector3.up * (poleBounds.min.y * (poleScale.y - scale.y));
+                }
+            }
+            if (inputColliders != null)
+                foreach (Collider item in inputColliders)
+                    if (item is CapsuleCollider capsule)
+                    {
+                        capsule.height = Mathf.Max(height, capsule.radius * 2f);
+                        Vector3 center = capsule.center;
+                        center.y = firstBuoyOffset.y + (height - buoyHeight) * 0.5f;
+                        capsule.center = center;
+                    }
+            SetInputEnabled(inputEnabled);
+        }
 
         [SerializeField] private Collider[] inputColliders;
         private InputSystem inputSystem;
@@ -27,6 +82,7 @@ namespace WaterConveyorSort.BoardSystem.Buoys
             if (inputColliders.Length == 0)
                 throw new InvalidOperationException($"Stack visual '{name}' requires an input collider.");
             if (isActiveAndEnabled) RegisterInput();
+            SetInputEnabled(owner.CanReceiveInput);
         }
 
         public void OnClick()
@@ -57,7 +113,7 @@ namespace WaterConveyorSort.BoardSystem.Buoys
         {
             // Source order is bottom to top for the initial layout.
             buoy.SetParent(buoyRoot != null ? buoyRoot : transform, false);
-            buoy.localPosition = firstBuoyOffset + Vector3.up * (index * buoySpacing);
+            buoy.localPosition = firstBuoyOffset + Vector3.up * (index * Step);
             buoy.localRotation = Quaternion.identity;
         }
         private bool released;
