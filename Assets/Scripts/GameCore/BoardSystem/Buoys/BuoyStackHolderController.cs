@@ -68,7 +68,7 @@ namespace WaterConveyorSort.BoardSystem.Buoys
                 visual.BindInput(stack, inputSystem);
                 for (int i = 0; i < source.Buoys.Count; i++)
                 {
-                    BuoyVisual buoyVisual = Object.Instantiate(buoyPrefab, visual.transform);
+                    BuoyVisual buoyVisual = BuoyVisual.Rent(buoyPrefab, visual.transform);
                     try
                     {
                         buoyVisual.name = $"Buoy_{i}";

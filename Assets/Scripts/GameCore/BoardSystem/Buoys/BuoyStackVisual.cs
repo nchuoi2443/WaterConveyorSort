@@ -19,6 +19,16 @@ namespace WaterConveyorSort.BoardSystem.Buoys
         private bool poleCached;
         private bool inputEnabled;
         private int count;
+        [Header("Consume Animation")]
+        [SerializeField, Min(0.01f)] private float consumeCollapseDuration = 0.25f;
+        [SerializeField, Min(0.01f)] private float consumePunchDuration = 0.12f;
+        [SerializeField, Min(0.01f)] private float consumeShrinkDuration = 0.18f;
+        [SerializeField, Min(1f)] private float consumePunchScale = 1.3f;
+        public float ConsumeCollapseDuration => Mathf.Max(0.01f, consumeCollapseDuration);
+        public float ConsumePunchDuration => Mathf.Max(0.01f, consumePunchDuration);
+        public float ConsumeShrinkDuration => Mathf.Max(0.01f, consumeShrinkDuration);
+        public float ConsumePunchScale => Mathf.Max(1f, consumePunchScale);
+
         [Header("Incoming Group")]
         [SerializeField, Min(0f)] private float receiveHeightTweenDuration = 0.2f;
         [SerializeField, Min(0.01f)] private float receiveDescentDuration = 0.25f;

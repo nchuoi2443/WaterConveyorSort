@@ -1,4 +1,4 @@
-﻿%YAML 1.1
+%YAML 1.1
 %TAG !u! tag:unity3d.com,2011:
 --- !u!114 &11400000
 MonoBehaviour:
@@ -16,16 +16,28 @@ MonoBehaviour:
   - code: 0
     displayName: Green
     color: {r: 0.34085336, g: 0.8867924, b: 0.15895326, a: 1}
+    material: {fileID: 2100000, guid: ba8874f24db2bf847aba65c599c923a8, type: 2}
   - code: 1
-    displayName: Orange
-    color: {r: 0.8792453, g: 0.520446, b: 0.077970766, a: 1}
+    displayName: Yellow
+    color: {r: 0.8784314, g: 0.7130115, b: 0.07843139, a: 1}
+    material: {fileID: 2100000, guid: 1670ff08a935cb1488710d9577b72dda, type: 2}
   - code: 2
     displayName: Red
     color: {r: 0.8784314, g: 0.15457322, b: 0.07843139, a: 1}
+    material: {fileID: 2100000, guid: db88a9cd0b59fcb44b8a0bedc6918c37, type: 2}
   - code: 3
-    displayName: Cyan
+    displayName: Blue
     color: {r: 0.36677104, g: 0.7577322, b: 0.8415094, a: 1}
+    material: {fileID: 2100000, guid: f4884f224a35ad94fb14c71bab9ff3f2, type: 2}
   - code: 4
     displayName: Purple
-    color: {r: 0.86415094, g: 0.16793872, b: 0.7120461, a: 1}
-
+    color: {r: 0.6981132, g: 0.2799039, b: 0.60832816, a: 1}
+    material: {fileID: 2100000, guid: 72d833f9dfb114d43bb9eb8ad940113d, type: 2}
+  - code: 5
+    displayName: Ping
+    color: {r: 0.9339623, g: 0.47138664, b: 0.83465225, a: 1}
+    material: {fileID: 2100000, guid: 502eb17a6250bd04ba54c7d004127c70, type: 2}
+  - code: 6
+    displayName: White
+    color: {r: 0.9339623, g: 0.47138664, b: 0.83465225, a: 1}
+    material: {fileID: 2100000, guid: 0d1607c3447d9184b8b12a7098b1398b, type: 2}

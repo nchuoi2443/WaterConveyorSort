@@ -1,4 +1,6 @@
+using System.Collections.Generic;
 using UnityEngine;
+using WaterConveyorSort.LevelData;
 
 namespace WaterConveyorSort.BoardSystem.Buoys
 {
@@ -6,15 +8,14 @@ namespace WaterConveyorSort.BoardSystem.Buoys
     {
         [Tooltip("Only renderers which should receive the buoy color.")]
         [SerializeField] private Renderer[] colorRenderers;
-        [SerializeField] private BuoyColorConfig colorConfig;
         private MaterialPropertyBlock propertyBlock;
         private static readonly int BaseColor = Shader.PropertyToID("_Color");
 
-        public void Refresh(int colorId, Color color)
+        public void Refresh(int colorId, Color color, ColorDataSO colors)
         {
-            if (colorConfig != null)
+            CacheDefaultMaterials();
+            if (colors.TryGetMaterial(colorId, out Material material))
             {
-                Material material = colorConfig.GetMaterial(colorId);
                 if (colorRenderers == null) return;
                 foreach (Renderer target in colorRenderers)
                 {
@@ -27,14 +28,26 @@ namespace WaterConveyorSort.BoardSystem.Buoys
 
             propertyBlock ??= new MaterialPropertyBlock();
             if (colorRenderers == null) return;
-            foreach (Renderer target in colorRenderers)
+            for (int i = 0; i < colorRenderers.Length; i++)
             {
+                Renderer target = colorRenderers[i];
                 if (target == null) continue;
+                target.sharedMaterials = defaultMaterials[i];
                 target.GetPropertyBlock(propertyBlock);
                 propertyBlock.SetColor(BaseColor, color);
                 target.SetPropertyBlock(propertyBlock);
             }
         }
+        private Material[][] defaultMaterials;
+
+        private void CacheDefaultMaterials()
+        {
+            if (defaultMaterials != null || colorRenderers == null) return;
+            defaultMaterials = new Material[colorRenderers.Length][];
+            for (int i = 0; i < colorRenderers.Length; i++)
+                if (colorRenderers[i] != null) defaultMaterials[i] = colorRenderers[i].sharedMaterials;
+        }
+
         public bool MoveTowards(Vector3 target, float distance)
         {
             transform.position = Vector3.MoveTowards(transform.position, target, distance);
@@ -75,14 +88,49 @@ namespace WaterConveyorSort.BoardSystem.Buoys
             spinningTransform = null;
             if (head != null) head.SetActive(true);
         }
+        private static readonly Dictionary<BuoyVisual, Stack<BuoyVisual>> pools = new Dictionary<BuoyVisual, Stack<BuoyVisual>>();
+        private BuoyVisual poolPrefab;
         private bool released;
+
+        [RuntimeInitializeOnLoadMethod(RuntimeInitializeLoadType.SubsystemRegistration)]
+        private static void ResetPools() => pools.Clear();
+
+        public static BuoyVisual Rent(BuoyVisual prefab, Transform parent)
+        {
+            if (!pools.TryGetValue(prefab, out Stack<BuoyVisual> pool))
+            {
+                pool = new Stack<BuoyVisual>();
+                pools.Add(prefab, pool);
+            }
+            BuoyVisual instance = null;
+            while (pool.Count > 0 && instance == null) instance = pool.Pop();
+            if (instance == null) instance = Instantiate(prefab, parent);
+            instance.poolPrefab = prefab;
+            instance.released = false;
+            instance.transform.SetParent(parent, false);
+            instance.transform.localPosition = prefab.transform.localPosition;
+            instance.transform.localRotation = prefab.transform.localRotation;
+            instance.transform.localScale = prefab.transform.localScale;
+            if (instance.spinRoot != null && prefab.spinRoot != null)
+                instance.spinRoot.localRotation = prefab.spinRoot.localRotation;
+            if (instance.head != null && prefab.head != null)
+                instance.head.transform.localRotation = prefab.head.transform.localRotation;
+            instance.EndFlight();
+            instance.gameObject.SetActive(true);
+            return instance;
+        }
 
         public void Release()
         {
             if (released) return;
             released = true;
             gameObject.SetActive(false);
-            Destroy(gameObject);
+            if (poolPrefab != null && pools.TryGetValue(poolPrefab, out Stack<BuoyVisual> pool))
+            {
+                transform.SetParent(null, false);
+                pool.Push(this);
+            }
+            else Destroy(gameObject);
         }
     }
 }

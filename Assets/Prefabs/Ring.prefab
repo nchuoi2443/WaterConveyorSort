@@ -49,7 +49,6 @@ MonoBehaviour:
   colorRenderers:
   - {fileID: 7736673831620230867}
   - {fileID: 7668804507500991020}
-  colorConfig: {fileID: 0}
   spinRoot: {fileID: 2536419536880322952}
   head: {fileID: 8173449902822355961}
   flightArcHeight: 1

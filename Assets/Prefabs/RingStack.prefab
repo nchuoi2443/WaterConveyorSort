@@ -197,6 +197,10 @@ MonoBehaviour:
   buoyHeight: 0.2
   emptyStackHeight: 0.2
   poleTransform: {fileID: 4846112679617301856}
+  consumeCollapseDuration: 0.25
+  consumePunchDuration: 0.25
+  consumeShrinkDuration: 0.2
+  consumePunchScale: 1.3
   receiveHeightTweenDuration: 0.2
   receiveDescentDuration: 0.25
   receiveTopClearance: 0.2

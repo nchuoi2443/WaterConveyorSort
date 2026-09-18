@@ -11,6 +11,19 @@ namespace WaterConveyorSort.LevelData
 
         public IReadOnlyList<ColorEntryData> Colors => colors;
 
+        public bool TryGetMaterial(int code, out Material material)
+        {
+            foreach (ColorEntryData entry in colors)
+            {
+                if (entry.Code != code) continue;
+                material = entry.Material;
+                return material != null;
+            }
+
+            material = null;
+            return false;
+        }
+
         public bool TryGetColor(int code, out Color color)
         {
             for (int i = 0; i < colors.Count; i++)
@@ -33,9 +46,12 @@ namespace WaterConveyorSort.LevelData
         [SerializeField] private int code;
         [SerializeField] private string displayName = "New Color";
         [SerializeField] private Color color = Color.white;
+        [Tooltip("Optional buoy material. Leave empty to tint the prefab material with this color.")]
+        [SerializeField] private Material material;
 
         public int Code => code;
         public string DisplayName => displayName;
         public Color Color => color;
+        public Material Material => material;
     }
 }

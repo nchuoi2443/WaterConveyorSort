@@ -9,6 +9,8 @@ namespace WaterConveyorSort.BoardSystem.Buoys
     {
         private readonly List<Transfer> transfers = new List<Transfer>();
         private readonly List<ReceiveTransfer> receives = new List<ReceiveTransfer>();
+        private readonly List<ReceiveTransfer> awaitingConsumeCompletion = new List<ReceiveTransfer>();
+        private readonly List<BuoyStack> consumingStacks = new List<BuoyStack>();
         private readonly ConveyorController conveyor;
         private int generation;
         private float flightSpeed = 4f;
@@ -72,6 +74,20 @@ namespace WaterConveyorSort.BoardSystem.Buoys
         public void Tick(float deltaTime, float speed, float interval)
         {
             if (IsPaused) return;
+            for (int i = consumingStacks.Count - 1; i >= 0; i--)
+            {
+                consumingStacks[i].TickConsume(deltaTime);
+                if (!consumingStacks[i].IsConsuming) consumingStacks.RemoveAt(i);
+            }
+            int tickGeneration = generation;
+            for (int i = 0; i < awaitingConsumeCompletion.Count;)
+            {
+                ReceiveTransfer completed = awaitingConsumeCompletion[i];
+                if (completed.Stack.IsConsuming) { i++; continue; }
+                awaitingConsumeCompletion.RemoveAt(i);
+                completed.Completed?.Invoke();
+                if (generation != tickGeneration || IsPaused) return;
+            }
             flightSpeed = speed;
             for (int t = transfers.Count - 1; t >= 0; t--)
             {
@@ -180,12 +196,16 @@ namespace WaterConveyorSort.BoardSystem.Buoys
                 int consumed = transfer.Stack.ConsumeTopGroups();
                 if (consumed > 0)
                 {
+                    if (!consumingStacks.Contains(transfer.Stack)) consumingStacks.Add(transfer.Stack);
                     // Keep later reserved destinations aligned after removing top buoys.
                     foreach (ReceiveTransfer pending in receives)
                         if (pending.Stack == transfer.Stack) pending.BaseIndex -= consumed;
                     transfer.Consumed?.Invoke(consumed);
                 }
-                transfer.Completed?.Invoke();
+                // A holder may clear its empty stack in this callback, so keep it busy
+                // until every consume animation on that stack has released its buoys.
+                if (transfer.Stack.IsConsuming) awaitingConsumeCompletion.Add(transfer);
+                else transfer.Completed?.Invoke();
             }
         }
         private static Vector3 EvaluateArc(Vector3 start, Vector3 target, Vector3 up, float progress, float height)
@@ -197,6 +217,8 @@ namespace WaterConveyorSort.BoardSystem.Buoys
         public void Clear()
         {
             generation++;
+            consumingStacks.Clear();
+            awaitingConsumeCompletion.Clear();
             foreach (ReceiveTransfer transfer in receives)
                 foreach (ReceiveFlight flight in transfer.Flights)
                     if (!flight.Arrived) flight.Buoy.Clear();
