@@ -31,7 +31,7 @@ namespace WaterConveyorSort.BoardSystem.StackQueue
 
         internal BuoyStackVisual SpawnStack(int index, int count)
         {
-            BuoyStackVisual visual = Instantiate(stackPrefab, spawnRoot != null ? spawnRoot : transform);
+            BuoyStackVisual visual = BuoyStackVisual.Rent(stackPrefab, spawnRoot != null ? spawnRoot : transform);
             visual.name = $"QueueStack_{index}";
             visual.transform.localPosition = GetStackOffset(index, count);
             visual.transform.localRotation = Quaternion.identity;

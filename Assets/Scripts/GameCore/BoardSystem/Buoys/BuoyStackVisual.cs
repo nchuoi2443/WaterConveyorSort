@@ -1,5 +1,7 @@
 using System;
 using UnityEngine;
+using System.Collections.Generic;
+using System.Collections;
 using WaterConveyorSort.InputHandling;
 
 namespace WaterConveyorSort.BoardSystem.Buoys
@@ -90,6 +92,12 @@ namespace WaterConveyorSort.BoardSystem.Buoys
         {
             count = buoyCount;
             if (reservedCount >= 0 && !fixedHeight) { SetInputEnabled(inputEnabled); return; }
+            // Keep the empty holder pole visible until its disappearance animation finishes.
+            if (count == 0 && !fixedHeight && displayedHeight > 0f)
+            {
+                SetInputEnabled(inputEnabled);
+                return;
+            }
             ApplyHeight(fixedHeight ? fixedStackHeight : HeightForCount(count));
         }
         private void ApplyHeight(float height)
@@ -181,23 +189,187 @@ namespace WaterConveyorSort.BoardSystem.Buoys
         public Vector3 GetBuoyPosition(int index) => (buoyRoot != null ? buoyRoot : transform)
             .TransformPoint(firstBuoyOffset + Vector3.up * (index * Step));
 
+        private Transform headFacingRoot;
+
+        internal void SetHeadFacingRoot(Transform holderRoot)
+        {
+            headFacingRoot = holderRoot;
+        }
+
+        internal void AlignBuoyHead(BuoyVisual buoy)
+        {
+            if (headFacingRoot != null)
+                buoy.SetHeadDirection(headFacingRoot.forward, headFacingRoot.up);
+        }
+
         public void PlaceBuoy(Transform buoy, int index)
         {
             // Source order is bottom to top for the initial layout.
             buoy.SetParent(buoyRoot != null ? buoyRoot : transform, false);
             buoy.localPosition = firstBuoyOffset + Vector3.up * (index * Step);
         }
+        private readonly List<ConsumeAnimation> consumeAnimations = new List<ConsumeAnimation>();
+        internal bool IsConsuming => consumeAnimations.Count > 0;
+
+        internal void PlayConsume(Transform[] group, Action completed)
+        {
+            consumeAnimations.Add(new ConsumeAnimation(group, completed));
+        }
+
+        internal void TickConsume(float deltaTime)
+        {
+            for (int i = consumeAnimations.Count - 1; i >= 0; i--)
+            {
+                ConsumeAnimation animation = consumeAnimations[i];
+                if (!animation.Tick(deltaTime, this)) continue;
+                consumeAnimations.RemoveAt(i);
+                animation.Completed?.Invoke();
+            }
+        }
+
+        internal void CancelConsume() => consumeAnimations.Clear();
+
+        private sealed class ConsumeAnimation
+        {
+            private readonly Transform[] group;
+            public Action Completed { get; }
+            private readonly Vector3[] positions;
+            private readonly Vector3[] scales;
+            private float elapsed;
+
+            public ConsumeAnimation(Transform[] group, Action completed)
+            {
+                this.group = group;
+                Completed = completed;
+                positions = new Vector3[group.Length];
+                scales = new Vector3[group.Length];
+                for (int i = 0; i < group.Length; i++)
+                {
+                    positions[i] = group[i].localPosition;
+                    scales[i] = group[i].localScale;
+                }
+            }
+
+            public bool Tick(float deltaTime, BuoyStackVisual settings)
+            {
+                elapsed += Mathf.Max(0f, deltaTime);
+                int bottom = group.Length - 1;
+                float upperPhaseDuration = settings.ConsumeCollapseDuration;
+                float upperScale = 1f - Mathf.SmoothStep(0f, 1f,
+                    Mathf.Clamp01(elapsed / upperPhaseDuration));
+                // Collapse the upper four around the bottom buoy without punching.
+                for (int i = 0; i < bottom; i++)
+                {
+                    Transform target = group[i];
+                    target.localPosition = positions[bottom] + (positions[i] - positions[bottom]) * upperScale;
+                    target.localScale = scales[i] * upperScale;
+                }
+                float bottomPhaseTime = elapsed - upperPhaseDuration;
+                if (bottomPhaseTime < 0f) return false;
+                float bottomScale = EvaluatePunchShrink(bottomPhaseTime, settings.ConsumePunchDuration,
+                    settings.ConsumeShrinkDuration, settings.ConsumePunchScale);
+                group[bottom].localScale = scales[bottom] * bottomScale;
+                return bottomPhaseTime >= settings.ConsumePunchDuration + settings.ConsumeShrinkDuration;
+            }
+
+            private static float EvaluatePunchShrink(float time, float punchDuration, float shrinkDuration, float punchScale)
+            {
+                if (time < punchDuration)
+                    return Mathf.Lerp(1f, punchScale, Mathf.Sin(Mathf.Clamp01(time / punchDuration) * Mathf.PI * 0.5f));
+                return Mathf.Lerp(punchScale, 0f,
+                    Mathf.SmoothStep(0f, 1f, Mathf.Clamp01((time - punchDuration) / shrinkDuration)));
+            }
+
+        }
+
+        [Header("Disappear Animation")]
+        [Tooltip("Time to shrink to zero after the punch.")]
+        [SerializeField, Min(0.01f)] private float disappearDuration = 0.25f;
+        [SerializeField, Min(0.01f)] private float disappearPunchDuration = 0.12f;
+        [SerializeField, Min(1f)] private float disappearPunchScale = 1.15f;
+        private Coroutine disappearTween;
+        private static readonly Dictionary<BuoyStackVisual, Stack<BuoyStackVisual>> pools = new Dictionary<BuoyStackVisual, Stack<BuoyStackVisual>>();
+        private BuoyStackVisual poolPrefab;
+
+        [RuntimeInitializeOnLoadMethod(RuntimeInitializeLoadType.SubsystemRegistration)]
+        private static void ResetPools() => pools.Clear();
+
+        public static BuoyStackVisual Rent(BuoyStackVisual prefab, Transform parent)
+        {
+            if (!pools.TryGetValue(prefab, out Stack<BuoyStackVisual> pool))
+            {
+                pool = new Stack<BuoyStackVisual>();
+                pools.Add(prefab, pool);
+            }
+            BuoyStackVisual instance = null;
+            while (pool.Count > 0 && instance == null) instance = pool.Pop();
+            if (instance == null) instance = Instantiate(prefab, parent);
+            instance.poolPrefab = prefab;
+            instance.released = false;
+            instance.transform.SetParent(parent, false);
+            instance.transform.localPosition = prefab.transform.localPosition;
+            instance.transform.localRotation = prefab.transform.localRotation;
+            instance.transform.localScale = prefab.transform.localScale;
+            instance.headFacingRoot = null;
+            instance.fixedHeight = false;
+            instance.reservedCount = -1;
+            instance.count = 0;
+            instance.displayedHeight = 0f;
+            instance.RefreshHeight(0);
+            instance.SetInputEnabled(false);
+            instance.gameObject.SetActive(true);
+            return instance;
+        }
+
+        public void PlayDisappear(Action completed, Func<bool> isPaused)
+        {
+            if (released || disappearTween != null) return;
+            SetInputEnabled(false);
+            disappearTween = StartCoroutine(Disappear(completed, isPaused));
+        }
+
+        private IEnumerator Disappear(Action completed, Func<bool> isPaused)
+        {
+            Vector3 startScale = transform.localScale;
+            float elapsed = 0f;
+            float punchDuration = Mathf.Max(0.01f, disappearPunchDuration);
+            float shrinkDuration = Mathf.Max(0.01f, disappearDuration);
+            float punchScale = Mathf.Max(1f, disappearPunchScale);
+            while (elapsed < punchDuration + shrinkDuration)
+            {
+                if (isPaused == null || !isPaused()) elapsed += Time.deltaTime;
+                float scale = elapsed < punchDuration
+                    ? Mathf.Lerp(1f, punchScale, Mathf.Sin(Mathf.Clamp01(elapsed / punchDuration) * Mathf.PI * 0.5f))
+                    : Mathf.Lerp(punchScale, 0f, Mathf.SmoothStep(0f, 1f,
+                        Mathf.Clamp01((elapsed - punchDuration) / shrinkDuration)));
+                transform.localScale = startScale * scale;
+                yield return null;
+            }
+            transform.localScale = Vector3.zero;
+            disappearTween = null;
+            completed?.Invoke();
+        }
+
         private bool released;
 
         public void Release()
         {
             if (released) return;
             released = true;
+            CancelConsume();
+            if (disappearTween != null) StopCoroutine(disappearTween);
+            disappearTween = null;
             UnregisterInput();
             owner = null;
             inputSystem = null;
+            headFacingRoot = null;
             gameObject.SetActive(false);
-            Destroy(gameObject);
+            if (poolPrefab != null && pools.TryGetValue(poolPrefab, out Stack<BuoyStackVisual> pool))
+            {
+                transform.SetParent(null, false);
+                pool.Push(this);
+            }
+            else Destroy(gameObject);
         }
     }
 }

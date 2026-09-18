@@ -9,8 +9,8 @@ namespace WaterConveyorSort.BoardSystem.Buoys
     {
         private readonly BuoyStackVisual visual;
         private readonly List<Buoy> buoys = new List<Buoy>();
-        private readonly List<ConsumeAnimation> consumeAnimations = new List<ConsumeAnimation>();
-        internal bool IsConsuming => consumeAnimations.Count > 0;
+        private readonly List<Buoy[]> consumingGroups = new List<Buoy[]>();
+        internal bool IsConsuming => visual.IsConsuming;
         private bool cleared;
         internal BuoyStackVisual Visual => visual;
         private bool canReceiveInput;
@@ -53,77 +53,20 @@ namespace WaterConveyorSort.BoardSystem.Buoys
                     buoys.RemoveAt(buoys.Count - 1);
                     group[i] = buoy;
                 }
-                consumeAnimations.Add(new ConsumeAnimation(group));
+                consumingGroups.Add(group);
+                var targets = new Transform[groupSize];
+                for (int i = 0; i < groupSize; i++) targets[i] = group[i].Visual.transform;
+                visual.PlayConsume(targets, () => FinishConsume(group));
                 consumed += groupSize;
             }
             if (consumed > 0) visual.RefreshHeight(buoys.Count);
             return consumed;
         }
 
-        internal void TickConsume(float deltaTime)
+        private void FinishConsume(Buoy[] group)
         {
-            for (int i = consumeAnimations.Count - 1; i >= 0; i--)
-            {
-                ConsumeAnimation animation = consumeAnimations[i];
-                if (!animation.Tick(deltaTime, visual)) continue;
-                animation.Clear();
-                consumeAnimations.RemoveAt(i);
-            }
-        }
-
-        private sealed class ConsumeAnimation
-        {
-            private readonly Buoy[] group;
-            private readonly Vector3[] positions;
-            private readonly Vector3[] scales;
-            private float elapsed;
-
-            public ConsumeAnimation(Buoy[] group)
-            {
-                this.group = group;
-                positions = new Vector3[group.Length];
-                scales = new Vector3[group.Length];
-                for (int i = 0; i < group.Length; i++)
-                {
-                    positions[i] = group[i].Visual.transform.localPosition;
-                    scales[i] = group[i].Visual.transform.localScale;
-                }
-            }
-
-            public bool Tick(float deltaTime, BuoyStackVisual settings)
-            {
-                elapsed += Mathf.Max(0f, deltaTime);
-                int bottom = group.Length - 1;
-                float upperPhaseDuration = settings.ConsumeCollapseDuration;
-                float upperScale = 1f - Mathf.SmoothStep(0f, 1f,
-                    Mathf.Clamp01(elapsed / upperPhaseDuration));
-                // Collapse the upper four around the bottom buoy without punching.
-                for (int i = 0; i < bottom; i++)
-                {
-                    Transform target = group[i].Visual.transform;
-                    target.localPosition = positions[bottom] + (positions[i] - positions[bottom]) * upperScale;
-                    target.localScale = scales[i] * upperScale;
-                }
-                float bottomPhaseTime = elapsed - upperPhaseDuration;
-                if (bottomPhaseTime < 0f) return false;
-                float bottomScale = EvaluatePunchShrink(bottomPhaseTime, settings.ConsumePunchDuration,
-                    settings.ConsumeShrinkDuration, settings.ConsumePunchScale);
-                group[bottom].Visual.transform.localScale = scales[bottom] * bottomScale;
-                return bottomPhaseTime >= settings.ConsumePunchDuration + settings.ConsumeShrinkDuration;
-            }
-
-            private static float EvaluatePunchShrink(float time, float punchDuration, float shrinkDuration, float punchScale)
-            {
-                if (time < punchDuration)
-                    return Mathf.Lerp(1f, punchScale, Mathf.Sin(Mathf.Clamp01(time / punchDuration) * Mathf.PI * 0.5f));
-                return Mathf.Lerp(punchScale, 0f,
-                    Mathf.SmoothStep(0f, 1f, Mathf.Clamp01((time - punchDuration) / shrinkDuration)));
-            }
-
-            public void Clear()
-            {
-                foreach (Buoy buoy in group) buoy.Clear();
-            }
+            if (!consumingGroups.Remove(group)) return;
+            foreach (Buoy buoy in group) buoy.Clear();
         }
 
         public event Action<BuoyStack> Clicked;
@@ -151,6 +94,7 @@ namespace WaterConveyorSort.BoardSystem.Buoys
             if (buoy == null) throw new ArgumentNullException(nameof(buoy));
             buoys.Add(buoy);
             visual.PlaceBuoy(buoy.Visual.transform, buoys.Count - 1);
+            visual.AlignBuoyHead(buoy.Visual);
             visual.RefreshHeight(buoys.Count);
         }
 
@@ -169,8 +113,10 @@ namespace WaterConveyorSort.BoardSystem.Buoys
             Clicked = null;
             foreach (Buoy buoy in buoys) buoy.Clear();
             buoys.Clear();
-            foreach (ConsumeAnimation animation in consumeAnimations) animation.Clear();
-            consumeAnimations.Clear();
+            if (visual != null) visual.CancelConsume();
+            foreach (Buoy[] group in consumingGroups)
+                foreach (Buoy buoy in group) buoy.Clear();
+            consumingGroups.Clear();
             if (visual != null) visual.Release();
         }
     }

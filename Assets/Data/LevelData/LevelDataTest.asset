@@ -61,7 +61,7 @@ MonoBehaviour:
         buoyType: 0
         buoyTypeCount: 0
         elements: []
-      - colorCode: 2
+      - colorCode: 1
         buoyType: 0
         buoyTypeCount: 0
         elements: []
@@ -69,7 +69,7 @@ MonoBehaviour:
         buoyType: 0
         buoyTypeCount: 0
         elements: []
-      - colorCode: 3
+      - colorCode: 2
         buoyType: 0
         buoyTypeCount: 0
         elements: []
@@ -104,15 +104,15 @@ MonoBehaviour:
       columnTypeCount: 0
       elements: []
       buoys:
-      - colorCode: 0
+      - colorCode: 1
         buoyType: 0
         buoyTypeCount: 0
         elements: []
-      - colorCode: 0
+      - colorCode: 1
         buoyType: 0
         buoyTypeCount: 0
         elements: []
-      - colorCode: 0
+      - colorCode: 1
         buoyType: 0
         buoyTypeCount: 0
         elements: []
@@ -131,11 +131,11 @@ MonoBehaviour:
       columnTypeCount: 0
       elements: []
       buoys:
-      - colorCode: 0
+      - colorCode: 2
         buoyType: 0
         buoyTypeCount: 0
         elements: []
-      - colorCode: 0
+      - colorCode: 2
         buoyType: 0
         buoyTypeCount: 0
         elements: []

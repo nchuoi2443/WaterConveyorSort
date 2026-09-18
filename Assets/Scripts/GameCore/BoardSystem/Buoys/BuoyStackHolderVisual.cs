@@ -2,6 +2,7 @@ using System;
 using TMPro;
 using System.Collections;
 using UnityEngine;
+using System.Collections.Generic;
 using WaterConveyorSort.BoardSystem.Conveyor;
 
 namespace WaterConveyorSort.BoardSystem.Buoys
@@ -109,17 +110,86 @@ namespace WaterConveyorSort.BoardSystem.Buoys
             stack.localPosition = firstStackOffset + stackStep * index;
             stack.localRotation = Quaternion.identity;
         }
+        [Header("Disappear Animation")]
+        [Tooltip("Time to shrink to zero after the punch.")]
+        [SerializeField, Min(0.01f)] private float disappearDuration = 0.25f;
+        [SerializeField, Min(0.01f)] private float disappearPunchDuration = 0.12f;
+        [SerializeField, Min(1f)] private float disappearPunchScale = 1.15f;
+        private Coroutine disappearTween;
+        private static readonly Dictionary<BuoyStackHolderVisual, Stack<BuoyStackHolderVisual>> pools = new Dictionary<BuoyStackHolderVisual, Stack<BuoyStackHolderVisual>>();
+        private BuoyStackHolderVisual poolPrefab;
+
+        [RuntimeInitializeOnLoadMethod(RuntimeInitializeLoadType.SubsystemRegistration)]
+        private static void ResetPools() => pools.Clear();
+
+        public static BuoyStackHolderVisual Rent(BuoyStackHolderVisual prefab, Transform parent)
+        {
+            if (!pools.TryGetValue(prefab, out Stack<BuoyStackHolderVisual> pool))
+            {
+                pool = new Stack<BuoyStackHolderVisual>();
+                pools.Add(prefab, pool);
+            }
+            BuoyStackHolderVisual instance = null;
+            while (pool.Count > 0 && instance == null) instance = pool.Pop();
+            if (instance == null) instance = Instantiate(prefab, parent);
+            instance.poolPrefab = prefab;
+            instance.released = false;
+            instance.transform.SetParent(parent, false);
+            instance.transform.localPosition = prefab.transform.localPosition;
+            instance.transform.localRotation = prefab.transform.localRotation;
+            instance.transform.localScale = prefab.transform.localScale;
+            if (instance.receiveCollider != null) instance.receiveCollider.enabled = true;
+            instance.gameObject.SetActive(true);
+            return instance;
+        }
+
+        public void PlayDisappear(Action completed, Func<bool> isPaused)
+        {
+            if (released || disappearTween != null) return;
+            if (receiveCollider != null) receiveCollider.enabled = false;
+            disappearTween = StartCoroutine(Disappear(completed, isPaused));
+        }
+
+        private IEnumerator Disappear(Action completed, Func<bool> isPaused)
+        {
+            Vector3 startScale = transform.localScale;
+            float elapsed = 0f;
+            float punchDuration = Mathf.Max(0.01f, disappearPunchDuration);
+            float shrinkDuration = Mathf.Max(0.01f, disappearDuration);
+            float punchScale = Mathf.Max(1f, disappearPunchScale);
+            while (elapsed < punchDuration + shrinkDuration)
+            {
+                if (isPaused == null || !isPaused()) elapsed += Time.deltaTime;
+                float scale = elapsed < punchDuration
+                    ? Mathf.Lerp(1f, punchScale, Mathf.Sin(Mathf.Clamp01(elapsed / punchDuration) * Mathf.PI * 0.5f))
+                    : Mathf.Lerp(punchScale, 0f, Mathf.SmoothStep(0f, 1f,
+                        Mathf.Clamp01((elapsed - punchDuration) / shrinkDuration)));
+                transform.localScale = startScale * scale;
+                yield return null;
+            }
+            transform.localScale = Vector3.zero;
+            disappearTween = null;
+            completed?.Invoke();
+        }
+
         private bool released;
 
         public void Release()
         {
             if (released) return;
             released = true;
+            if (disappearTween != null) StopCoroutine(disappearTween);
+            disappearTween = null;
             owner = null;
             if (advanceTween != null) StopCoroutine(advanceTween);
             advanceTween = null;
             gameObject.SetActive(false);
-            Destroy(gameObject);
+            if (poolPrefab != null && pools.TryGetValue(poolPrefab, out Stack<BuoyStackHolderVisual> pool))
+            {
+                transform.SetParent(null, false);
+                pool.Push(this);
+            }
+            else Destroy(gameObject);
         }
     }
 }

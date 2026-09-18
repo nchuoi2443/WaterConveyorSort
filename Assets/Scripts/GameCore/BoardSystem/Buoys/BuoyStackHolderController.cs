@@ -39,7 +39,7 @@ namespace WaterConveyorSort.BoardSystem.Buoys
             {
                 foreach (BuoyNodeData node in nodes)
                 {
-                    BuoyStackHolderVisual visual = Object.Instantiate(holderPrefab, boardRoot);
+                    BuoyStackHolderVisual visual = BuoyStackHolderVisual.Rent(holderPrefab, boardRoot);
                     try
                     {
                         visual.name = $"Holder_{node.GridPosition.x}_{node.GridPosition.y}";
@@ -60,7 +60,7 @@ namespace WaterConveyorSort.BoardSystem.Buoys
         private static BuoyStack CreateStack(Transform parent, BuoyColumnData source,
             int index, ColorDataSO colors, BuoyStackVisual stackPrefab, BuoyVisual buoyPrefab, InputSystem inputSystem)
         {
-            BuoyStackVisual visual = Object.Instantiate(stackPrefab, parent);
+            BuoyStackVisual visual = BuoyStackVisual.Rent(stackPrefab, parent);
             try
             {
                 visual.name = $"Stack_{index}";

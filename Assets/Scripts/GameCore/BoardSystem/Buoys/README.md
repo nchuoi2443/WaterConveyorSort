@@ -175,3 +175,11 @@ QuickOutline shares reference-counted Mask/Fill material pairs for identical mod
 Receive completion callbacks wait until all consume animations on their stack finish. This keeps holders busy and prevents empty-stack cleanup/promotion from releasing the animated buoys early; queue input also remains locked until completion. Reservation counts and incoming destination indices are still rebased immediately. Board teardown cancels the deferred callbacks.
 
 ColorDataSO stores an optional Material per color entry alongside its code, display name, and editor color. Buoys use the level palette directly, without a separate material config asset on the prefab. Assigned materials are shared; entries with no material tint the original prefab materials through MaterialPropertyBlock. Pooled buoys restore the original materials before using this fallback.
+
+Empty holder stacks shrink to zero before returning to their prefab pool. The rear stack advances only after this animation completes. When no visible or pending stacks remain, the holder also shrinks and returns to its pool. Disappear Duration on each visual controls its animation, which respects transfer pause. Level teardown cancels active disappearance animations and releases immediately. Queue stacks remain available when empty. Renting stack and holder visuals resets scale and input/receive state; holder poles keep their final height until shrinking completes.
+
+Consume transform animation and its tick state belong to BuoyStackVisual. BuoyStack owns the consumed groups and releases them when the visual completion callback runs. Clearing the stack cancels visual callbacks before releasing unfinished groups.
+
+Stack and holder disappearance starts with a scale punch, then shrinks to zero. Disappear Punch Duration controls the growth time, Disappear Punch Scale controls the peak relative to the original scale, and Disappear Duration controls the subsequent shrink. Pool release and stack promotion wait for both parts to finish.
+
+Holder stacks orient buoy heads along the holder root forward/up, which represents OutletDirection in board space. Initial and promoted stacks use this facing, and received buoy heads are aligned after placement so the flight rotation and reparenting cannot override it. Queue stacks retain their existing behavior.

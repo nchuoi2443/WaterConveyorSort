@@ -76,7 +76,7 @@ namespace WaterConveyorSort.BoardSystem.Buoys
             if (IsPaused) return;
             for (int i = consumingStacks.Count - 1; i >= 0; i--)
             {
-                consumingStacks[i].TickConsume(deltaTime);
+                consumingStacks[i].Visual.TickConsume(deltaTime);
                 if (!consumingStacks[i].IsConsuming) consumingStacks.RemoveAt(i);
             }
             int tickGeneration = generation;

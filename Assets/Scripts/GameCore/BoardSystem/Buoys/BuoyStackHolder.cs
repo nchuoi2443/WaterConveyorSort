@@ -54,6 +54,8 @@ namespace WaterConveyorSort.BoardSystem.Buoys
                 stacks.Add(stack);
                 stack.Clicked += OnStackClicked;
                 visual.PlaceStack(stack.Visual.transform, stacks.Count - 1);
+                stack.Visual.SetHeadFacingRoot(visual.transform);
+                foreach (Buoy buoy in stack.Buoys) stack.Visual.AlignBuoyHead(buoy.Visual);
                 stack.CanReceiveInput = false;
             }
         }
@@ -98,8 +100,16 @@ namespace WaterConveyorSort.BoardSystem.Buoys
                 RefreshInput();
                 return;
             }
-            ActiveStack.Clicked -= OnStackClicked;
-            ActiveStack.Clear();
+            BuoyStack finished = ActiveStack;
+            finished.Clicked -= OnStackClicked;
+            finished.CanReceiveInput = false;
+            finished.Visual.PlayDisappear(() => FinishStackDisappear(finished), () => transfer != null && transfer.IsPaused);
+        }
+
+        private void FinishStackDisappear(BuoyStack finished)
+        {
+            if (cleared) return;
+            finished.Clear();
             stacks.RemoveAt(0);
             Transform promoted = ActiveStack != null ? ActiveStack.Visual.transform : null;
             // The replacement appears in the rear slot while the previous rear stack advances.
@@ -118,7 +128,11 @@ namespace WaterConveyorSort.BoardSystem.Buoys
         private void RefreshInput()
         {
             if (!cleared) visual.SetQueueStatus(VisibleCapacity, RemainingStackCount);
-            if (!cleared) visual.SetVisible(stacks.Count > 0 || pending.Count > 0);
+            if (!cleared && stacks.Count == 0 && pending.Count == 0)
+            {
+                busy = true;
+                visual.PlayDisappear(Clear, () => transfer != null && transfer.IsPaused);
+            }
             for (int i = 0; i < stacks.Count; i++)
                 stacks[i].CanReceiveInput = i == 0 && !busy && !cleared && transfer != null;
         }
