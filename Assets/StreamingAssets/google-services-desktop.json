@@ -1,0 +1,29 @@
+{
+  "project_info": {
+    "project_number": "779737830237",
+    "project_id": "waterconveyorsort",
+    "storage_bucket": "waterconveyorsort.firebasestorage.app"
+  },
+  "client": [
+    {
+      "client_info": {
+        "mobilesdk_app_id": "1:779737830237:android:00160ee0db6e42fb180eb4",
+        "android_client_info": {
+          "package_name": "com.nchuoigame.waterconveyorsort"
+        }
+      },
+      "oauth_client": [],
+      "api_key": [
+        {
+          "current_key": "AIzaSyA0J9UDKdZt_AmGzj2G6VF2Vy-SrL330Jg"
+        }
+      ],
+      "services": {
+        "appinvite_service": {
+          "other_platform_oauth_client": []
+        }
+      }
+    }
+  ],
+  "configuration_version": "1"
+}

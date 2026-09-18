@@ -18,6 +18,7 @@ namespace WaterConveyorSort.Ads
         private AdMobInterstitialSample interstitial;
 
         [Header("Full Ads Timer")]
+        [SerializeField] private bool autoShowInterstitials = true;
         [Tooltip("Seconds between full-screen ads. Zero disables automatic interstitials.")]
         [SerializeField, Min(0f)] private float fullAdsRestTime = 60f;
         public float FullAdsRestTime => fullAdsRestTime;
@@ -69,6 +70,7 @@ namespace WaterConveyorSort.Ads
         private void Update()
         {
             if (Instance != this) return;
+            if (!autoShowInterstitials || interstitial == null) return;
             // Editor panel focus should not stop the timer while inspecting it.
             if (!Application.isEditor && (applicationPaused || !Application.isFocused)) return;
             if (skipTimerTick) { skipTimerTick = false; return; }
